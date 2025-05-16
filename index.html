@@ -3,114 +3,155 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Transformer LLM Visualizer</title>
+    <title>Advanced Transformer LLM Visualizer</title>
     <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
     <link href="https://unpkg.com/vis-network/styles/vis-network.min.css" rel="stylesheet" type="text/css" />
     <style>
-        body { font-family: sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; background-color: #f0f2f5; }
-        h1 { margin-top: 15px; margin-bottom: 15px; color: #333; }
-        .container { display: flex; width: 98%; max-width: 1800px; /* Increased max-width */ }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; background-color: #eef2f7; color: #333; }
+        h1 { margin-top: 15px; margin-bottom: 15px; color: #2c3e50; font-weight: 600;}
+        .container { display: flex; width: 98%; max-width: 2000px; /* Wider for more detail */ }
         .controls {
-            width: 380px; /* Slightly wider */
-            padding: 15px;
-            border: 1px solid #ccc;
+            width: 400px; /* Wider control panel */
+            padding: 20px;
+            border: 1px solid #bdc3c7;
             border-radius: 8px;
-            background-color: #f9f9f9;
+            background-color: #f8f9fa;
             margin-right: 20px;
             height: fit-content;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+            overflow-y: auto; /* Allow scrolling if controls get too long */
+            max-height: 90vh; /* Max height for controls */
         }
-        .controls h2 { margin-top: 0; font-size: 1.2em; color: #007bff; }
-        .controls label { display: block; margin-top: 8px; font-weight: bold; font-size: 0.9em; }
+        .controls h2 { margin-top: 0; font-size: 1.3em; color: #2980b9; border-bottom: 2px solid #3498db; padding-bottom: 5px;}
+        .control-group { margin-bottom: 15px; padding: 10px; border: 1px solid #ecf0f1; border-radius: 5px; background-color: #ffffff; }
+        .control-group legend { font-weight: bold; color: #34495e; font-size: 1em; padding: 0 5px; }
+        .controls label { display: block; margin-top: 8px; font-weight: 500; font-size: 0.9em; color: #555; }
         .controls input[type="number"],
         .controls input[type="text"],
         .controls select {
-            width: calc(100% - 16px); /* Adjusted for padding */
-            padding: 8px;
-            margin-top: 4px;
-            border: 1px solid #ddd;
+            width: calc(100% - 18px);
+            padding: 9px;
+            margin-top: 5px;
+            border: 1px solid #d1d9e0;
             border-radius: 4px;
             box-sizing: border-box;
             font-size: 0.9em;
+            background-color: #fff;
         }
+         .controls input[type="checkbox"] { margin-right: 5px; vertical-align: middle;}
+        .controls .checkbox-label { font-weight: normal; display: inline; margin-top: 10px;}
+
         .controls button {
             display: block;
             width: 100%;
-            padding: 10px;
-            margin-top: 15px;
-            background-color: #007bff;
+            padding: 12px;
+            margin-top: 20px;
+            background-color: #3498db;
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: 5px;
             cursor: pointer;
-            font-size: 1em;
+            font-size: 1.05em;
+            transition: background-color 0.2s ease;
         }
-        .controls button:hover { background-color: #0056b3; }
+        .controls button:hover { background-color: #2980b9; }
         #mynetwork {
             flex-grow: 1;
-            min-height: 650px; /* Adjusted min-height */
-            height: 90vh; /* Make it responsive to viewport height */
-            border: 1px solid #ccc;
+            min-height: 700px;
+            height: calc(100vh - 100px); /* Adjust based on header/footer */
+            border: 1px solid #bdc3c7;
             border-radius: 8px;
             background-color: #ffffff;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
         }
         .info-box {
             margin-top: 15px;
-            padding: 10px;
-            background-color: #eef2f7;
-            border: 1px solid #d1d9e0;
-            border-radius: 4px;
-            font-size: 0.85em;
+            padding: 12px;
+            background-color: #f0f9ff;
+            border: 1px solid #a9d6f5;
+            border-radius: 5px;
+            font-size: 0.8em;
         }
-        .info-box strong { display: block; margin-bottom: 5px; color: #0056b3; }
-        .info-box span { display: block; margin-bottom: 3px; }
+        .info-box strong { display: block; margin-bottom: 6px; color: #1f6aa5; font-size: 0.9em;}
+        .info-box span { display: block; margin-bottom: 4px; }
     </style>
 </head>
 <body>
-    <h1>Transformer LLM Structure Visualizer</h1>
+    <h1>Advanced Transformer LLM Structure Visualizer</h1>
 
     <div class="container">
         <div class="controls">
-            <h2>Configuration</h2>
-            <label for="numLayers">Total Transformer Layers:</label>
-            <input type="number" id="numLayers" value="4"> <label for="hiddenSize">Hidden Size ($d_{model}$):</label>
-            <input type="number" id="hiddenSize" value="512"> <label for="numAttentionHeads">Attention Heads ($N_h$):</label>
-            <input type="number" id="numAttentionHeads" value="8"> <label for="intermediateSizeDense">FFN Intermediate Size (Dense):</label>
-            <input type="number" id="intermediateSizeDense" value="2048">
+            <h2>Model Configuration</h2>
 
-            <label for="intermediateSizeMoe">FFN Intermediate Size (MoE Experts):</label>
-            <input type="number" id="intermediateSizeMoe" value="1024">
+            <fieldset class="control-group">
+                <legend>Basic Structure</legend>
+                <label for="numLayers">Total Transformer Layers:</label>
+                <input type="number" id="numLayers" value="2">
 
-            <label for="layerTypes">Layer Types (e.g., dense, moe:8, dense):</label>
-            <input type="text" id="layerTypes" value="dense,moe:8,dense,moe:4">
+                <label for="hiddenSize">Hidden Size ($d_{model}$):</label>
+                <input type="number" id="hiddenSize" value="256">
 
-            <label for="positionalEmbeddingType">Positional Embedding Type:</label>
-            <select id="positionalEmbeddingType">
-                <option value="learned_absolute">Learned Absolute</option>
-                <option value="sinusoidal_absolute">Sinusoidal Absolute</option>
-                <option value="rotary">Rotary (RoPE)</option>
-                <option value="alibi">ALiBi</option>
-                <option value="none">None</option>
-            </select>
+                <label for="layerNormStyle">LayerNorm Style:</label>
+                <select id="layerNormStyle">
+                    <option value="post_ln">Post-LN (GPT-2 style Add&Norm)</option>
+                    <option value="pre_ln" selected>Pre-LN (Llama style, default)</option>
+                </select>
+            </fieldset>
 
-            <label for="moeSharedExperts">MoE Shared Experts (if MoE layers exist):</label>
-            <input type="number" id="moeSharedExperts" value="1">
+            <fieldset class="control-group">
+                <legend>Attention Mechanism</legend>
+                <label for="numAttentionHeads">Attention Heads ($N_h$):</label>
+                <input type="number" id="numAttentionHeads" value="4">
 
+                <label for="positionalEmbeddingType">Positional Embedding Type:</label>
+                <select id="positionalEmbeddingType">
+                    <option value="learned_absolute">Learned Absolute</option>
+                    <option value="sinusoidal_absolute">Sinusoidal Absolute</option>
+                    <option value="rotary" selected>Rotary (RoPE)</option>
+                    <option value="alibi">ALiBi</option>
+                    <option value="none">None</option>
+                </select>
+                <input type="checkbox" id="qkNormalization" checked>
+                <label for="qkNormalization" class="checkbox-label">Enable QK Normalization (in MHA)</label>
+            </fieldset>
+
+            <fieldset class="control-group">
+                <legend>Feed-Forward Network (FFN)</legend>
+                <label for="intermediateSizeDense">FFN Intermediate Size (Dense):</label>
+                <input type="number" id="intermediateSizeDense" value="1024">
+                 <label for="layerTypes">Layer Types (FFN: dense or moe:N_experts):</label>
+                <input type="text" id="layerTypes" value="dense,moe:8">
+            </fieldset>
+
+            <fieldset class="control-group" id="moe_specific_controls">
+                <legend>Mixture of Experts (MoE) - if used</legend>
+                <label for="intermediateSizeMoe">FFN Intermediate Size (MoE Experts):</label>
+                <input type="number" id="intermediateSizeMoe" value="512">
+                <label for="moeSharedExperts">MoE Shared Experts Count:</label>
+                <input type="number" id="moeSharedExperts" value="1">
+            </fieldset>
+
+             <fieldset class="control-group">
+                <legend>Regularization</legend>
+                <label for="dropoutRate">Dropout Rate (0.0 to 1.0):</label>
+                <input type="number" id="dropoutRate" value="0.1" step="0.05" min="0" max="1">
+            </fieldset>
 
             <button onclick="drawTransformer()">Render Model</button>
 
             <div class="info-box">
                 <strong>Node Colors Guide:</strong>
-                <span>Input/Output: Light Grey</span>
-                <span>Block Title: Dark Grey</span>
-                <span>LayerNorm/Add&Norm: Sky Blue</span>
+                <span>Input/Output Blocks: Light Grey</span>
+                <span>LayerNorm: Sky Blue</span>
                 <span>MHA Components: Blues</span>
-                <span>SDPA+Softmax: Medium Blue</span>
+                <span>SDPA+Softmax/QK Norm: Medium Blue</span>
                 <span>Dense FFN: Yellows</span>
                 <span>MoE Router/Agg: Salmon</span>
                 <span>MoE Sparse Expert: Peach</span>
                 <span>MoE Shared Expert: Light Green</span>
+                <span>Dropout: Light Purple</span>
+                <span>Loss/Sampling: Indigo/Teal</span>
+                <span>RoPE Info: Light Yellow (Comment)</span>
             </div>
         </div>
 
