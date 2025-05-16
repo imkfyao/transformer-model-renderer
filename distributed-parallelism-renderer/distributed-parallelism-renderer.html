@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Transformer Topology & Memory Calculator</title>
+  <style>
+    /* Base & Sidebar Styles */
+     body { font-family: Arial, sans-serif; margin: 20px; display: flex; gap: 30px; }
+    .main-content {
+        flex-grow: 1;
+        position: relative;
+        overflow-x: auto; /* Allow horizontal scroll */
+     }
+    .sidebar { width: 350px; flex-shrink: 0; border-left: 1px solid #ccc; padding-left: 20px; overflow-y: auto; max-height: 95vh;}
+     .config-form, .model-params-form { margin-bottom: 20px; display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center;}
+    .config-form label, .model-params-form label { font-weight: bold; grid-column: 1 / 2; white-space: nowrap; }
+    .model-params-form label[for="distributedOptimizer"],
+    .model-params-form label[for="sequenceParallelism"] /* Align checkbox labels */
+     { grid-column: 1 / 2; }
+    .config-form input[type="text"], .model-params-form input[type="number"], .model-params-form select { padding: 8px; font-size: 0.95rem; width: 100%; box-sizing: border-box; grid-column: 2 / 3; }
+    .model-params-form input[type="checkbox"] { grid-column: 2 / 3; justify-self: start; margin-top: 5px; width: 1.1em; height: 1.1em; }
+    .config-form button { grid-column: 1 / -1; padding: 10px 15px; font-size: 1rem; cursor: pointer; margin-top: 10px; }
+    #totalParamsDisplay { margin-top: 15px; font-weight: bold; background-color: #f0f0f0; padding: 10px; border-radius: 5px; }
+    #warningDisplay { color: #c00; font-weight: bold; margin-top: 10px; font-size: 0.9em;}
+
+    /* Topology Structure Styles */
+    .topology-display { display: flex; flex-direction: column; gap: 0; padding-top: 10px; align-items: flex-start; padding-bottom: 20px; position: relative; z-index: 1; width: max-content; min-width: 100%; }
+    .pp-stage-group { border: 2px solid #009688; border-radius: 8px; padding: 10px; background: #E0F2F1; display: flex; align-items: stretch; width: max-content; min-width: 300px; margin-bottom: 35px; }
+    .pp-gauge { width: 10px; background-color: #e0e0e0; border: 1px solid #bbb; margin-right: 10px; flex-shrink: 0; }
+    .pp-content-wrapper { flex-grow: 1; display: flex; flex-direction: column; min-width: 0; align-items: center; }
+    .pp-stage-title { font-size: 1.1rem; margin-bottom: 10px; font-weight: bold; color: #00695C; text-align: center; }
+    .dp-rank-box-container { display: flex; gap: 15px; justify-content: center; flex-wrap: nowrap; padding-bottom: 5px; width: fit-content; max-width: 100%; }
+    .dp-rank-box { border: 2px solid #007ACC; border-radius: 8px; padding: 8px; background-color: rgba(0, 122, 204, 0.08); display: flex; flex-direction: column; align-items: center; }
+    .dp-rank-title { font-size: 1rem; margin-bottom: 8px; font-weight: bold; color: #005A9E; }
+    .tp-rank-group { display: flex; gap: 5px; justify-content: center; }
+    .rank-block { border: 1px solid #555; border-radius: 4px; padding: 5px; background: #f9f9f9; min-width: 75px; font-size: 0.8rem; position: relative; cursor: default; line-height: 1.3; text-align: center; transition: transform 0.1s ease-in-out; display: flex; flex-direction: column; justify-content: center; }
+    .rank-block > div { margin-bottom: 1px; }
+    .rank-block:hover { transform: scale(1.05); z-index: 10; }
+    #arrowOverlaySvg { position:absolute; top:0; left:0; width:100%; height: 100%; pointer-events:none; z-index: 5; overflow: visible; }
+    .tooltip { display: none; position: absolute; background-color: rgba(0, 0, 0, 0.85); color: white; padding: 8px 12px; border-radius: 4px; font-size: 0.9rem; z-index: 100; pointer-events: none; white-space: pre; bottom: 110%; left: 50%; transform: translateX(-50%); min-width: 220px; }
+    .rank-block:hover .tooltip { display: block; }
+    hr.section-divider { grid-column: 1 / -1; border: 0; border-top: 1px solid #eee; margin: 10px 0;}
+
+  </style>
+</head>
+<body>
+
+  <div class="sidebar">
+     <h2>Configuration</h2>
+     <form id="modelParamsForm" class="model-params-form">
+        <label for="paramL">Layers (L):</label><input type="number" id="paramL" value="24">
+        <label for="paramH">Hidden Size (H):</label><input type="number" id="paramH" value="2048">
+        <label for="paramN">Attention Heads (N):</label><input type="number" id="paramN" value="16">
+        <label for="paramG">KV Heads (G):</label><input type="number" id="paramG" value="16">
+        <label for="paramD">Attn Dim/Head (D):</label><input type="number" id="paramD" value="128">
+        <label for="paramV">Vocab Size (V):</label><input type="number" id="paramV" value="151936">
+        <label for="paramE">Num Experts (E):</label><input type="number" id="paramE" value="60" title="Set to 0 to disable MoE and use standard MLP">
+        <label for="paramMoEI">MoE Interm. Size (i):</label><input type="number" id="paramMoEI" value="1408" title="FFN intermediate size per expert (if E > 0)">
+        <label for="paramMLPI">MLP Interm. Size (I):</label><input type="number" id="paramMLPI" value="8192" title="Standard FFN intermediate size (used if E = 0)">
+        <label for="dataType">Data Type:</label><select id="dataType"><option value="bf16" selected>bf16</option><option value="fp16">fp16</option><option value="fp32">fp32</option></select>
+
+        <hr class="section-divider">
+        <label for="paramS">Sequence Len (s):</label><input type="number" id="paramS" value="2048">
+        <label for="paramB">Batch Size / DP Rank (b):</label><input type="number" id="paramB" value="1">
+        <label for="ckptTechnique">Activation Ckpt:</label>
+        <select id="ckptTechnique" title="Activation Checkpointing Technique">
+            <option value="None" selected>None</option>
+            <option value="Selective">Selective</option>
+            <option value="Full">Full</option>
+        </select>
+        <label for="sequenceParallelism">Sequence Parallel:</label>
+        <input type="checkbox" id="sequenceParallelism" title="Enable Sequence Parallelism (shards activations over TP dim)">
+         <label for="distributedOptimizer">Distributed Optim:</label>
+        <input type="checkbox" id="distributedOptimizer" title="Use Distributed Optimizer: Shards optimizer states across DP group (ZeRO Stage 2 style memory saving).">
+    </form>
+     <form id="configForm" class="config-form">
+        <label for="configInput">Parallelism:</label><input type="text" id="configInput" placeholder="TP=2,PP=2,DP=4,EP=2" value="TP=2,PP=2,DP=4,EP=2" />
+        <button type="submit">Render Topology & Calculate Memory</button>
+    </form>
+    <div id="totalParamsDisplay">Total Parameters: N/A</div>
+    <div id="warningDisplay"></div>
+  </div>
+
+  <div class="main-content">
+     <h1>Transformer Model Parallelism Topology</h1>
+     <div id="topologyContainer" class="topology-display">
+        </div>
+     <svg id="arrowOverlaySvg">
+        <defs>
+            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="5" refY="3.5" orient="auto" fill="#555">
+                <polygon points="0 0, 10 3.5, 0 7" />
+            </marker>
+        </defs>
+     </svg>
+  </div>
+
+  <script>
+    // --- Constants ---
+    const RANKS_PER_NODE = 8;
+    const SVG_NS = "http://www.w3.org/2000/svg";
+
+    // --- Helper Functions ---
+    function parseConfig(configStr) { const config={TP:1,PP:1,DP:1,EP:1};configStr.split(',').map(item=>item.trim()).forEach(pair=>{const [key,value]=pair.split('=');const upperKey=key?.toUpperCase();if(upperKey&&value&&config.hasOwnProperty(upperKey)){config[upperKey]=parseInt(value,10);if(isNaN(config[upperKey])||config[upperKey]<=0){console.warn(`Invalid value for ${upperKey}: ${value}. Using 1.`);config[upperKey]=1;}}});return config; }
+    function getModelParams() {
+        const E_val = parseInt(document.getElementById('paramE').value, 10) || 0;
+        const H_val = parseInt(document.getElementById('paramH').value, 10) || 2048;
+        const modelParams = {
+            L: parseInt(document.getElementById('paramL').value, 10) || 24,
+            H: H_val,
+            N: parseInt(document.getElementById('paramN').value, 10) || 16,
+            G: parseInt(document.getElementById('paramG').value, 10) || 16,
+            D: parseInt(document.getElementById('paramD').value, 10) || 128,
+            V: parseInt(document.getElementById('paramV').value, 10) || 151936,
+            E: E_val,
+            i: E_val > 0 ? (parseInt(document.getElementById('paramMoEI').value, 10) || 1408) : 0, // MoE intermediate size per expert
+            I_mlp: parseInt(document.getElementById('paramMLPI').value, 10) || (H_val * 4), // Standard MLP intermediate size
+            dataType: document.getElementById('dataType').value || 'bf16'
+        };
+        if (modelParams.N < modelParams.G) {modelParams.G = modelParams.N; document.getElementById('paramG').value = modelParams.G;}
+        if (modelParams.N * modelParams.D !== modelParams.H) { console.warn(`H (${modelParams.H}) != N*D (${modelParams.N}*${modelParams.D})`); }
+        // Override I_mlp if E > 0, as it's not used for parameter calculation then
+        if (E_val > 0) modelParams.I_mlp = 0;
+        return modelParams;
+    }
+    function getBytesPerParam(dataType) { switch(dataType){case 'fp32':return 4;case 'fp16':case 'bf16':default:return 2;} }
+    function formatBytes(bytes, decimals = 2) { if(bytes===0||isNaN(bytes))return '0 Bytes';const k=1024;const dm=decimals<0?0:decimals;const sizes=['Bytes','KB','MB','GB','TB','PB','EB','ZB','YB'];if(!isFinite(bytes)||bytes<1)return parseFloat(bytes.toFixed(dm))+' Bytes';const i=Math.max(0,Math.floor(Math.log(bytes)/Math.log(k)));return parseFloat((bytes/Math.pow(k,i)).toFixed(dm))+' '+sizes[i]; }
+    // --- Updated Memory Calculation ---
+    function calculateParamsAndMemory(modelParams, parallelismConfig) {
+        // Read settings
+        const useDistributedOptimizer = document.getElementById('distributedOptimizer').checked;
+        const ckptTechnique = document.getElementById('ckptTechnique').value;
+        const useSequenceParallelism = document.getElementById('sequenceParallelism').checked;
+        const s = parseFloat(document.getElementById('paramS').value) || 2048;
+        const b = parseInt(document.getElementById('paramB').value) || 1;
+
+        const { L, H, N, G, D, V, E, i, I_mlp, dataType } = modelParams;
+        const { TP, EP, PP, DP } = parallelismConfig;
+
+        // --- Parameter Calculation ---
+        const attn_params_per_layer = (H * N * D) + (H * G * D) + (H * G * D) + (N * D * H);
+        const i_eff_param = E > 0 ? i : I_mlp; // Effective intermediate size used in FFN
+        const ffn_params_per_layer = E > 0 ? (E * (2 * H * i) + H * E) : (2 * H * I_mlp);
+        const ln_params_per_layer = 2 * (2 * H);
+        const total_transformer_layer_params = attn_params_per_layer + ffn_params_per_layer + ln_params_per_layer;
+        const embedding_params = (V * H);
+        const output_layer_params = (H * V);
+        const total_model_params = (L * total_transformer_layer_params) + embedding_params + output_layer_params;
+
+        const tp_safe = Math.max(1, TP);
+        const ep_safe = Math.max(1, EP);
+        const pp_safe = Math.max(1, PP);
+        const dp_safe = Math.max(1, DP);
+
+        const attn_params_per_layer_rank = attn_params_per_layer / tp_safe;
+        const ffn_experts_params_rank = E > 0 ? (E * (2 * H * i)) / (ep_safe * tp_safe) : 0;
+        const ffn_gate_params_rank = E > 0 ? (H * E) / tp_safe : 0;
+        const ffn_mlp_params_rank = E === 0 ? (2 * H * I_mlp) / tp_safe : 0;
+        const ffn_params_per_layer_rank = ffn_experts_params_rank + ffn_gate_params_rank + ffn_mlp_params_rank;
+        const ln_params_per_layer_rank = ln_params_per_layer;
+        const total_transformer_layer_params_rank = attn_params_per_layer_rank + ffn_params_per_layer_rank + ln_params_per_layer_rank;
+        const embedding_params_rank = embedding_params / tp_safe;
+        const output_layer_params_rank = output_layer_params / tp_safe;
+        const approx_transformer_layers_per_stage = L / pp_safe;
+        const total_model_params_rank = (approx_transformer_layers_per_stage * total_transformer_layer_params_rank) + (embedding_params_rank / pp_safe) + (output_layer_params_rank / pp_safe);
+
+        // --- Memory for Params, Optimizer, Gradients ---
+        const bytes_per_param = getBytesPerParam(dataType);
+        const model_states_memory_rank = total_model_params_rank * bytes_per_param;
+        let optimizer_states_memory_rank = total_model_params_rank * 2 * 4; // Default AdamW fp32
+        if (useDistributedOptimizer && dp_safe > 1) {
+            optimizer_states_memory_rank /= dp_safe; // ZeRO-2 style sharding
+        }
+        const gradients_memory_rank = total_model_params_rank * bytes_per_param;
+
+        // --- Activation Memory Calculation ---
+        const bytes_for_activation = getBytesPerParam(dataType);
+        const i_eff_activation = E > 0 ? i : I_mlp; // Effective intermediate size for activations
+
+        const sp_factor = useSequenceParallelism ? tp_safe : 1; // Sequence Parallelism shard factor
+        const s_eff = s / sp_factor; // Effective sequence length per rank
+
+        const L_stage = L / pp_safe; // Avg layers per stage on this rank
+
+        let layers_to_store_activations;
+        if (ckptTechnique === 'Full') {
+            layers_to_store_activations = 1; // Approx: store 1 layer's activation equivalent
+        } else if (ckptTechnique === 'Selective') {
+            layers_to_store_activations = Math.ceil(L_stage / 2); // Approx: store half layers
+        } else { // None
+            layers_to_store_activations = L_stage;
+        }
+        layers_to_store_activations = Math.max(0, layers_to_store_activations); // Ensure non-negative
+
+        // Size of MLP/FFN activation per rank (sharded by TP and maybe EP)
+        const sharding_factor_ffn = E > 0 ? (tp_safe * ep_safe) : tp_safe;
+        const ffn_act_size_per_rank = (i_eff_activation > 0 && sharding_factor_ffn > 0)
+            ? s_eff * b * (i_eff_activation / sharding_factor_ffn) * bytes_for_activation
+            : 0;
+
+        // Size of Attention output activation per rank (sharded by TP)
+        const attn_act_size_per_rank = (H > 0 && tp_safe > 0)
+            ? s_eff * b * (H / tp_safe) * bytes_for_activation
+            : 0;
+
+        // Approx activation memory per layer, per rank
+        const act_mem_per_layer_rank = ffn_act_size_per_rank + attn_act_size_per_rank;
+
+        // Total activation memory (approximate)
+        const activation_memory = layers_to_store_activations * act_mem_per_layer_rank;
+
+        // --- Total Memory ---
+        const total_memory_per_rank = model_states_memory_rank
+                                     + optimizer_states_memory_rank
+                                     + gradients_memory_rank
+                                     + activation_memory;
+
+        const nonNegative = (num) => Math.max(0, num);
+        return {
+            totalParams: nonNegative(total_model_params),
+            paramsPerRank: nonNegative(total_model_params_rank),
+            memoryPerRank: {
+                total: nonNegative(total_memory_per_rank),
+                modelStates: nonNegative(model_states_memory_rank),
+                optimizerStates: nonNegative(optimizer_states_memory_rank),
+                gradients: nonNegative(gradients_memory_rank),
+                activations: nonNegative(activation_memory) // Add activation breakdown
+            }
+        };
+    }
+    // Rank Coordinate Calculation
+    function computeRankCoordinates(globalRank, TP, PP, DP, EP) {
+        const tpRank = globalRank % TP;
+        const dpIndex = Math.floor(globalRank / TP) % DP;
+        const ppStage = Math.floor(globalRank / (TP * DP));
+        let epRank = -1;
+        const dpPerEP = DP / EP;
+        if (DP > 0 && EP > 0 && EP <= DP) {
+             epRank = Math.floor(dpIndex / Math.max(1, dpPerEP));
+        }
+        return { pp_stage: ppStage, dp_index: dpIndex, tp_rank: tpRank, ep_rank: epRank };
+    }
+
+
+    // --- Rendering Logic ---
+    function renderTopology(memoryInfo, parallelismConfig) {
+      const container = document.getElementById("topologyContainer");
+      const warningContainer = document.getElementById("warningDisplay");
+      container.innerHTML = "";
+      let warnings = [];
+
+      const { TP, PP, DP, EP } = parallelismConfig;
+      const numExperts = parseInt(document.getElementById('paramE').value, 10) || 0;
+
+      // Validation checks
+      if (DP > 0 && EP > 0 && DP % EP !== 0) { warnings.push(`Warning: DP (${DP}) not divisible by EP (${EP}). EP rank assignment may be inconsistent.`); }
+      if (numExperts > 0 && EP > 0 && numExperts % EP !== 0) { warnings.push(`Warning: Total Experts (${numExperts}) not divisible by EP degree (${EP}). Expert distribution may be uneven.`); }
+      if (!memoryInfo) { container.innerHTML = "<p>Memory info missing.</p>"; return; }
+
+      const totalRanks = TP * PP * DP * EP;
+      const totalPPStages = PP;
+      const estimatedMemoryPerNode = memoryInfo.memoryPerRank.total * RANKS_PER_NODE; // This now includes activations
+
+      // *** Updated Tooltip String Definition ***
+      const memTooltipContentBase = `Memory/Rank: ${formatBytes(memoryInfo.memoryPerRank.total)} (P: ${memoryInfo.paramsPerRank.toLocaleString()})\n`
+                                  + ` Model: ${formatBytes(memoryInfo.memoryPerRank.modelStates)}\n`
+                                  + ` Optim: ${formatBytes(memoryInfo.memoryPerRank.optimizerStates)}\n`
+                                  + ` Grads: ${formatBytes(memoryInfo.memoryPerRank.gradients)}\n`
+                                  + ` Activ: ${formatBytes(memoryInfo.memoryPerRank.activations)}`; // Added activation line
+
+       // Loop PP -> DP -> TP
+       for (let p = 0; p < PP; p++) {
+            const ppDiv = document.createElement("div"); ppDiv.className = "pp-stage-group"; ppDiv.setAttribute("data-pp-stage", p);
+            const gaugeDiv = document.createElement("div"); gaugeDiv.className = "pp-gauge";
+            const endPercent = ((totalPPStages - p) / totalPPStages) * 100; const startPercent = ((totalPPStages - (p + 1)) / totalPPStages) * 100;
+            const safeStartPercent = Math.max(0, startPercent); const fillColor = '#009688'; const emptyColor = '#e0e0e0';
+            gaugeDiv.style.background = `linear-gradient(to top, ${emptyColor} ${safeStartPercent}%, ${fillColor} ${safeStartPercent}%, ${fillColor} ${endPercent}%, ${emptyColor} ${endPercent}%)`;
+            ppDiv.appendChild(gaugeDiv);
+            const ppContentWrapper = document.createElement("div"); ppContentWrapper.className = "pp-content-wrapper";
+            const ppTitle = document.createElement("div"); ppTitle.className = "pp-stage-title"; ppTitle.textContent = `PP Stage ${p}`; ppContentWrapper.appendChild(ppTitle);
+            const dpContainer = document.createElement("div"); dpContainer.className = "dp-rank-box-container";
+
+            for (let d = 0; d < DP; d++) {
+                const dpBox = document.createElement("div"); dpBox.className = "dp-rank-box";
+                const dpTitle = document.createElement("div"); dpTitle.className = "dp-rank-title"; dpTitle.textContent = `DP Rank ${d}`; dpBox.appendChild(dpTitle);
+                const tpGroup = document.createElement("div"); tpGroup.className = "tp-rank-group";
+                for (let t = 0; t < TP; t++) {
+                    const globalRank = p * (DP * TP) + d * TP + t;
+                    if (globalRank >= totalRanks) continue;
+                    const coords = computeRankCoordinates(globalRank, TP, PP, DP, EP);
+                    const nodeId = Math.floor(globalRank / RANKS_PER_NODE);
+                    const rankBlock = document.createElement("div"); rankBlock.className = "rank-block";
+                    rankBlock.setAttribute("data-rank-id", globalRank); rankBlock.setAttribute("data-dp-index", coords.dp_index);
+                    rankBlock.setAttribute("data-tp-rank", coords.tp_rank); rankBlock.setAttribute("data-pp-stage", coords.pp_stage);
+
+                    let expertAnnotation = "";
+                    const isMoEActive = numExperts > 0 && EP > 0 && coords.ep_rank !== -1;
+                    if (isMoEActive) {
+                         if (numExperts % EP === 0) { const expertsPerEpRank = numExperts / EP; const startExpert = coords.ep_rank * expertsPerEpRank; const endExpert = startExpert + expertsPerEpRank - 1; expertAnnotation = `<div>Exp: ${startExpert}-${endExpert}</div>`; }
+                         else { expertAnnotation = `<div>Exp: (Uneven)</div>`; }
+                    }
+
+                    rankBlock.innerHTML = `
+                        <div>Rank ${globalRank}</div>
+                        <div>TP Rank: ${coords.tp_rank}</div>
+                        <div>EP Rank: ${coords.ep_rank !== -1 ? coords.ep_rank : 'N/A'}</div>
+                        ${expertAnnotation}
+                        <div class="tooltip">${memTooltipContentBase}\n(Node ${nodeId}, EP ${coords.ep_rank !== -1 ? coords.ep_rank : 'N/A'})\nEst. Node Mem: ${formatBytes(estimatedMemoryPerNode)}*\n*Est. Node Mem includes activation estimate.\n Activation calculation is approximate.</div>
+                    `; // Updated tooltip note
+                    tpGroup.appendChild(rankBlock);
+                } dpBox.appendChild(tpGroup); dpContainer.appendChild(dpBox);
+            } ppContentWrapper.appendChild(dpContainer); ppDiv.appendChild(ppContentWrapper); container.appendChild(ppDiv);
+       }
+
+       warningContainer.innerHTML = warnings.join("<br>");
+       requestAnimationFrame(() => { drawArrows(parallelismConfig); });
+    }
+
+    // --- UPDATED drawArrows function (Logic Corrected) ---
+    function drawArrows(parallelismConfig) {
+        const { TP, PP, DP } = parallelismConfig;
+        const arrowSvg = document.getElementById("arrowOverlaySvg");
+        const mainContainer = document.querySelector(".main-content");
+
+        while (arrowSvg && arrowSvg.lastChild && arrowSvg.lastChild.tagName !== 'defs') { arrowSvg.removeChild(arrowSvg.lastChild); }
+        if (!arrowSvg || !mainContainer || PP <= 1) return;
+
+        const mainContainerRect = mainContainer.getBoundingClientRect();
+        for (let d = 0; d < DP; d++) {
+            for (let t = 0; t < TP; t++) {
+                let previousBlock = null;
+                for (let p = 0; p < PP; p++) {
+                    const currentBlock = document.querySelector(`.rank-block[data-pp-stage="${p}"][data-dp-index="${d}"][data-tp-rank="${t}"]`);
+                    if (currentBlock && previousBlock) {
+                        const prevRect = previousBlock.getBoundingClientRect(); const currentRect = currentBlock.getBoundingClientRect();
+                        const x1 = (prevRect.left - mainContainerRect.left) + mainContainer.scrollLeft + prevRect.width / 2; const y1 = (prevRect.bottom - mainContainerRect.top) + mainContainer.scrollTop;
+                        const x2 = (currentRect.left - mainContainerRect.left) + mainContainer.scrollLeft + currentRect.width / 2; const y2 = (currentRect.top - mainContainerRect.top) + mainContainer.scrollTop;
+                        const line = document.createElementNS(SVG_NS, "line");
+                        line.setAttribute("x1", x1.toFixed(1)); line.setAttribute("y1", y1.toFixed(1)); line.setAttribute("x2", x2.toFixed(1)); line.setAttribute("y2", (y2 - 5).toFixed(1));
+                        line.setAttribute("stroke", "#555"); line.setAttribute("stroke-width", "2"); line.setAttribute("marker-end", "url(#arrowhead)");
+                        arrowSvg.appendChild(line);
+                    }
+                    previousBlock = currentBlock;
+                }
+            }
+        }
+    }
+
+    // --- Event Listeners ---
+    document.getElementById("configForm").addEventListener("submit", function(e) { e.preventDefault(); try { const configStr = document.getElementById("configInput").value; const parallelismConfig = parseConfig(configStr); const modelParams = getModelParams(); const memoryInfo = calculateParamsAndMemory(modelParams, parallelismConfig); document.getElementById("totalParamsDisplay").textContent = `Total Parameters: ${memoryInfo.totalParams.toLocaleString()} (~${formatBytes(memoryInfo.totalParams * getBytesPerParam(modelParams.dataType))})`; renderTopology(memoryInfo, parallelismConfig); } catch (error) { console.error("Error processing configuration:", error); document.getElementById("topologyContainer").innerHTML = `<p style="color: red;">Error: ${error.message}. Check console.</p>`; document.getElementById("totalParamsDisplay").textContent = "Total Parameters: Error"; document.getElementById("warningDisplay").textContent = `Error: ${error.message}`; const arrowSvg=document.getElementById("arrowOverlaySvg"); if(arrowSvg) arrowSvg.innerHTML = '<defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="5" refY="3.5" orient="auto" fill="#555"><polygon points="0 0, 10 3.5, 0 7" /></marker></defs>'; } });
+    window.addEventListener("DOMContentLoaded", () => {
+      // Initial calculation
+      document.getElementById("configForm").dispatchEvent(new Event('submit'));
+
+      // Add listeners for all relevant inputs
+      const inputsToWatch = [
+          'paramL', 'paramH', 'paramN', 'paramG', 'paramD', 'paramV',
+          'paramE', 'paramMoEI', 'paramMLPI', 'dataType',
+          'paramS', 'paramB', 'ckptTechnique',
+          'sequenceParallelism', 'distributedOptimizer'
+      ];
+      inputsToWatch.forEach(id => {
+          const element = document.getElementById(id);
+          if (element) {
+              element.addEventListener('change', () => {
+                  // Check if MoE related fields should enable/disable based on E
+                  const numExperts = parseInt(document.getElementById('paramE').value, 10) || 0;
+                  document.getElementById('paramMoEI').disabled = (numExperts === 0);
+                  document.getElementById('paramMLPI').disabled = (numExperts > 0);
+
+                  console.log(`${id} changed, recalculating...`);
+                  document.getElementById("configForm").dispatchEvent(new Event('submit'));
+              });
+          }
+      });
+       // Initial check for MoE fields enable/disable
+       const initialNumExperts = parseInt(document.getElementById('paramE').value, 10) || 0;
+       document.getElementById('paramMoEI').disabled = (initialNumExperts === 0);
+       document.getElementById('paramMLPI').disabled = (initialNumExperts > 0);
+
+
+      // Debounce resize handler
+      let resizeTimeout;
+      window.addEventListener("resize", () => {
+          clearTimeout(resizeTimeout);
+          resizeTimeout = setTimeout(() => {
+                console.log("Resizing, redrawing arrows...");
+                const configStr = document.getElementById("configInput").value;
+                const currentParallelismConfig = parseConfig(configStr);
+                drawArrows(currentParallelismConfig);
+          }, 150);
+      });
+    });
+
+  </script>
+</body>
+</html>
