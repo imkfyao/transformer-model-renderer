@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transformer Decoder Parameter Calculator</title>
+    <style>
+        /* Reset and global styles */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+            padding: 2rem;
+            text-align: left; /* Default text alignment for body */
+            height: 100vh; /* Make body fill viewport height */
+            overflow: hidden; /* Hide body scrollbar as container will manage scrolling */
+        }
+
+        .container {
+            display: flex;
+            gap: 2rem;
+            max-width: 1400px; /* Keep max-width to prevent it from getting too wide on super large screens */
+            margin: auto;
+            flex-wrap: wrap; /* Keep wrap for smaller screens */
+            height: calc(100vh - 4rem); /* Container takes viewport height minus padding */
+            overflow-y: hidden; /* Hide container scrollbar, children will manage */
+        }
+
+        .input-section {
+            flex: 0 0 280px; /* Fixed width for input */
+            min-width: 280px;
+            background: #fff;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+            overflow-y: auto; /* Enable independent vertical scrolling */
+            height: 100%; /* Take full height of the container */
+        }
+
+         .results-container {
+             flex: 1; /* Allow results container to grow and take remaining space */
+             min-width: 600px; /* Ensure minimum width for the combined result panels */
+             display: flex; /* Enable flex for arranging result and right sections */
+             flex-direction: row; /* Arrange children horizontally */
+             gap: 2rem; /* Space between middle and right panels */
+             overflow-y: auto; /* Enable independent vertical scrolling for the *container* */
+             height: 100%; /* Take full height of the container */
+             /* align-items: stretch; Removed as it can interfere with content height */
+         }
+
+
+        .result-section, .right-section {
+            flex: 1; /* Allow both middle and right sections to grow and shrink equally */
+            background: #ffffff;
+            padding: 1.5rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+            /* Let height be determined by content. Removed height: 100%; */
+            /* overflow-y: auto; Removed from here - results-container handles scrolling */
+        }
+
+         .result-section h3, .right-section h3 {
+             text-align: center; /* Center headings in result/right panels */
+             width: 100%;
+         }
+
+        /* Media query for stacking panels on smaller screens */
+        @media (max-width: 960px) {
+            body {
+                height: auto; /* Revert body height */
+                overflow: auto; /* Revert body overflow */
+            }
+             .container {
+                flex-direction: column;
+                height: auto; /* Revert container height */
+                 overflow-y: auto; /* Revert container overflow */
+                 gap: 1.5rem; /* Adjust gap */
+                 max-width: none; /* Remove max-width on small screens */
+            }
+             .input-section, .results-container {
+                flex: 1 1 auto; /* Allow sections to grow and shrink as needed */
+                min-width: 0; /* Remove min-width override in column layout */
+                 height: auto; /* Revert to auto height */
+                 overflow-y: visible; /* Disable independent scrolling */
+            }
+             .results-container {
+                 flex-direction: column; /* Stack result panels vertically */
+                 gap: 1.5rem; /* Adjust gap */
+                 min-width: 0; /* Remove min-width override */
+                 align-items: stretch; /* Keep stretch for vertical stacking */
+             }
+             .result-section h3, .right-section h3 {
+                 text-align: left; /* Revert headings to left-align in column layout */
+             }
+              .result-section, .right-section {
+                 padding: 1rem; /* Adjust padding */
+                 flex-grow: 0; /* Remove flex-grow when stacked */
+                 flex-basis: auto; /* Revert flex-basis when stacked */
+                 display: flex; /* Restore flex for internal content layout */
+                 flex-direction: column; /* Restore column direction for internal content */
+                 height: auto; /* Allow height to be determined by content when stacked */
+                 overflow-y: visible; /* Restore default overflow */
+                 min-height: auto; /* Remove min-height override when stacked */
+             }
+
+        }
+
+
+        input, select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 1rem;
+            margin-top: 0.3rem;
+            transition: border 0.3s ease;
+        }
+
+        input:focus, select:focus {
+            border-color: #4A90E2;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.2);
+        }
+
+        h2 {
+            margin-bottom: 1rem;
+            color: #2d3748;
+            font-size: 1.8rem; /* Slightly larger heading for the main title */
+        }
+
+         h3 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+            color: #2d3748;
+            font-size: 1.5rem;
+        }
+
+
+        label {
+            display: block;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        .form-group {
+            margin-bottom: 1.2rem;
+        }
+
+        .form-group label {
+            display: flex; /* Keep flex for aligning checkbox and text */
+            align-items: center;
+            font-weight: normal;
+            margin-bottom: 0; /* Adjust margin for checkbox group */
+        }
+
+        .form-group input[type="checkbox"] {
+             width: auto; /* Allow checkbox to take its natural width */
+             margin-right: 10px; /* Add some space between checkbox and text */
+             margin-top: 0; /* Remove top margin */
+        }
+
+        .default-note {
+            font-size: 0.85rem;
+            color: #718096;
+            margin-top: 0.5rem; /* Adjust margin top */
+            margin-bottom: 1rem;
+        }
+
+        /* Enhanced Collapsible */
+        .collapsible {
+            cursor: pointer;
+            background-color: #f0f0f0;
+            padding: 12px 16px;
+            border-radius: 8px;
+            position: relative;
+            font-weight: 600;
+            margin: 0.5rem 0;
+            transition: background 0.3s;
+            padding-left: 36px;
+            overflow: hidden;
+            border: none; /* Remove default button border */
+            text-align: left; /* Ensure text is left-aligned */
+            width: 100%; /* Take full width */
+        }
+
+        .collapsible:hover {
+            background-color: #e6e6e6;
+        }
+
+        .collapsible::before {
+            content: '▶'; /* Default to closed triangle */
+            position: absolute;
+            left: 12px;
+            top: 50%; /* Center vertically */
+            transform: translateY(-50%) rotate(0deg); /* Initial rotation */
+            transition: transform 0.3s ease; /* Smooth rotation */
+            font-size: 0.9rem;
+            color: #4A90E2;
+        }
+
+        .collapsible.expanded::before {
+             content: '▼'; /* Change content for expanded */
+             transform: translateY(-50%) rotate(0deg); /* Keep rotation at 0 for expanded */
+        }
+
+
+        .collapsible-content {
+            display: block;
+            margin-left: 20px;
+            padding: 0.8rem 1rem; /* Keep original padding when expanded */
+            margin-top: 0.5rem;
+            background: #f9f9f9;
+            border-left: 3px solid #4A90E2;
+            border-radius: 4px;
+            overflow: hidden; /* Crucial for height transition */
+            transition: max-height 0.3s ease-out, padding 0.3s ease-out, margin-top 0.3s ease-out; /* Transition margin-top too */
+            max-height: 2000px; /* Increased max-height to show more content */
+            box-sizing: border-box; /* Include padding in height */
+            white-space: pre-wrap; /* Preserve line breaks from JS */
+            text-align: left; /* Ensure content text is left-aligned */
+            width: 100%; /* Ensure it takes full width */
+             line-height: 1.4; /* Adjust line height for better readability */
+        }
+
+        .collapsible-content.collapsed {
+            max-height: 0;
+            padding-top: 0; /* Collapse padding */
+            padding-bottom: 0; /* Collapse padding */
+            margin-top: 0; /* Remove margin above collapsed content */
+            border-left-color: transparent; /* Hide border when collapsed */
+        }
+
+        .note {
+            font-size: 0.85rem;
+            color: #555;
+            margin-top: 0.8rem;
+            display: block; /* Ensure note is on its own line */
+        }
+
+        .highlight {
+            color: #4A90E2;
+            font-weight: bold;
+        }
+
+         /* Added padding-right to the body for better spacing on wider screens */
+        body {
+            padding: 2rem;
+        }
+
+         .result-group {
+             margin-bottom: 1.5rem;
+             /* Removed padding-bottom */
+             /* Removed border-bottom */
+         }
+
+         .result-group:last-child {
+             border-bottom: none;
+             padding-bottom: 0;
+             /* Removed margin-bottom */
+         }
+
+         /* Style for the toggler button */
+         .toggler-button {
+             background-color: #4A90E2;
+             color: white;
+             border: none;
+             padding: 8px 15px;
+             border-radius: 6px;
+             cursor: pointer;
+             font-size: 0.9rem;
+             margin-bottom: 1rem;
+             transition: background-color 0.3s ease;
+             align-self: flex-start; /* Align button to the left */
+             width: 100%; /* Make button full width */
+             text-align: center; /* Center text in the toggler button */
+         }
+
+         .toggler-button:hover {
+             background-color: #357ABD;
+         }
+
+         /* Style for annotations/legends */
+         .annotation {
+             font-size: 0.8em; /* Smaller font size for annotations */
+             color: #555; /* Grey out annotations */
+             margin-top: 0.5em;
+             display: block; /* Ensure it's on a new line */
+         }
+
+         /* Style for text inside collapsible content that should be left-aligned */
+         .collapsible-content p {
+             text-align: left;
+             margin-bottom: 0.5em; /* Add some spacing between calculation lines */
+         }
+          .collapsible-content p:last-child {
+              margin-bottom: 0;
+          }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="input-section">
+            <h2>Transformer Parameters</h2>
+            <form id="modelForm">
+                <label>Vocabulary Size:
+                    <input type="number" id="vocabSize" value="152064" required>
+                </label>
+                <label>Hidden Size:
+                    <input type="number" id="hiddenSize" value="2048" required>
+                </label>
+                <label>Number of Attention Heads:
+                    <select id="numHeads" required>
+                        <option value="8">8</option>
+                        <option value="16" selected>16</option>
+                        <option value="24">24</option>
+                        <option value="32">32</option>
+                        <option value="40">40</option>
+                        <option value="48">48</option>
+                        <option value="56">56</option>
+                        <option value="64">64</option>
+                        <option value="72">72</option>
+                        <option value="80">80</option>
+                        <option value="88">88</option>
+                        <option value="96">96</option>
+                        <option value="104">104</option>
+                        <option value="112">112</option>
+                        <option value="120">120</option>
+                        <option value="128">128</option>
+                    </select>
+                </label>
+                 <label>Query Groups:
+                    <select id="queryGroups" required>
+                        </select>
+                </label>
+                <div class="form-group">
+                    <label>Normalization Type:</label>
+                    <select id="normType" required>
+                        <option value="layernorm">LayerNorm</option>
+                        <option value="rmsnorm" selected>RMSNorm</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="qkvBias">
+                        <input type="checkbox" id="qkvBias" checked>
+                        Q/K/V Bias
+                    </label>
+                     <div class="default-note" style="margin-top:0.5rem;">Includes bias parameters for Q, K, and V projections.</div>
+                </div>
+                <label>Dense Intermediate Size:
+                    <input type="number" id="denseIntermediate" value="0" required>
+                </label>
+                <label>Router Expert Intermediate Size:
+                    <input type="number" id="routerIntermediate" value="1408" required>
+                </label>
+                <label>Shared Expert Intermediate Size:
+                    <input type="number" id="sharedIntermediate" value="5632" required>
+                </label>
+                <label>Number of Router Experts:
+                    <input type="number" id="numRouterExperts" value="60" required>
+                </label>
+                <label>Number of Shared Experts:
+                    <input type="number" id="numSharedExperts" value="1" required>
+                </label>
+                <label>Number of Layers:
+                    <input type="number" id="numLayers" value="24" required>
+                </label>
+                <label>Tensor Parallelism (TP) Size:
+                    <select id="tpSize" required>
+                        <option value="1" selected>1</option>
+                        <option value="2">2</option>
+                        <option value="4">4</option>
+                        <option value="6">6</option>
+                        <option value="8">8</option>
+                        <option value="16">16</option>
+                    </select>
+                </label>
+                <label>Pipeline Parallelism (PP) Size:
+                    <select id="ppSize" required>
+                        <option value="1" selected>1</option>
+                        <option value="2">2</option>
+                        <option value="4">4</option>
+                        <option value="6">6</option>
+                        <option value="8">8</option>
+                        <option value="10">10</option>
+                        <option value="12">12</option>
+                        <option value="14">14</option>
+                        <option value="16">16</option>
+                    </select>
+                </label>
+                <label>Expert Parallelism (EP) Size:
+                    <select id="epSize" required>
+                        <option value="1" selected>1</option>
+                        <option value="2">2</option>
+                        <option value="4">4</option>
+                        <option value="6">6</option>
+                        <option value="8">8</option>
+                        <option value="16">16</option>
+                        <option value="32">32</option>
+                    </select>
+                </label>
+                <label>Expert Tensor Parallelism (Expert TP) Size:
+                    <select id="expertTPSize" required>
+                        <option value="1" selected>1</option>
+                        <option value="2">2</option>
+                        <option value="4">4</option>
+                        <option value="8">8</option>
+                        <option value="16">16</option>
+                    </select>
+                </label>
+                 <div class="form-group">
+                    <label for="enableDO">
+                        <input type="checkbox" id="enableDO">
+                        Enable Distributed Optimizer (DO)
+                    </label>
+                     <div class="default-note" style="margin-top:0.5rem;">Shards optimizer states across Data Parallel ranks.</div>
+                </div>
+                 <label id="dpSizeLabel">Data Parallelism (DP) Size:
+                    <select id="dpSize" required disabled>
+                        <option value="1" selected>1</option>
+                        <option value="2">2</option>
+                        <option value="4">4</option>
+                        <option value="8">8</option>
+                        <option value="16">16</option>
+                        <option value="24">24</option>
+                        <option value="32">32</option>
+                        <option value="48">48</option>
+                        <option value="64">64</option>
+                        <option value="96">96</option>
+                        <option value="128">128</option>
+                    </select>
+                </label>
+            </form>
+        </div>
+
+        <div class="results-container">
+             <div class="result-section" id="results">
+                <h3>Model Parameters (Full Model)</h3>
+                <button type="button" class="toggler-button" id="resultsToggler">Expand/Collapse All</button>
+                <p><strong>Total Parameters:</strong> <span id="totalParamCount"></span> parameters</p>
+                <p><strong>Total Memory Consumption:</strong> <span id="totalMemoryFull"></span></p>
+                <div class="result-group">
+                    <button type="button" class="collapsible expanded">Word Embedding: <span id="memWordEmbedding"></span></button>
+                    <div class="collapsible-content" id="detailsWordEmbedding"></div>
+                </div>
+                 <div class="result-group">
+                     <button type="button" class="collapsible expanded">Normalization (Per-Norm): <span id="memNorm"></span></button>
+                     <div class="collapsible-content" id="detailsNorm"></div>
+                 </div>
+                <div class="result-group">
+                    <button type="button" class="collapsible expanded">QKV Projection: <span id="memQkv"></span></button>
+                    <div class="collapsible-content" id="detailsQkv"></div>
+                </div>
+                <div class="result-group">
+                    <button type="button" class="collapsible expanded">Attention Output: <span id="memAttnOutput"></span></button>
+                    <div class="collapsible-content" id="detailsAttnOutput"></div>
+                </div>
+                <div class="result-group">
+                    <button type="button" class="collapsible expanded">MLP Components: <span id="memTotalMlp"></span></button>
+                    <div class="collapsible-content" id="detailsMlp"></div>
+                </div>
+                 <div class="result-group">
+                     <button type="button" class="collapsible expanded">Per-Layer Total: <span id="memPerLayer"></span></button>
+                     <div class="collapsible-content" id="detailsPerLayer"></div>
+                 </div>
+                  <div class="result-group">
+                     <button type="button" class="collapsible expanded">Output Norm: <span id="memOutputNorm"></span></button>
+                     <div class="collapsible-content" id="detailsOutputNorm"></div>
+                 </div>
+                  <div class="result-group">
+                     <button type="button" class="collapsible expanded">Output Layer: <span id="memOutputLayer"></span></button>
+                     <div class="collapsible-content" id="detailsOutputLayer"></div>
+                 </div>
+                 <div class="result-group">
+                     <button type="button" class="collapsible expanded">Final Totals (Full Model): <span id="memTotalFull"></span></button>
+                     <div class="collapsible-content" id="detailsTotalFull"></div>
+                 </div>
+                 <div class="result-group">
+                     <button type="button" class="collapsible expanded">Head Dimension: <span id="headDim"></span></button>
+                     <div class="collapsible-content" id="detailsHeadDim"></div>
+                 </div>
+            </div>
+
+            <div class="right-section" id="rightPanel">
+                <h3>Memory Per Rank (Training)</h3>
+                 <button type="button" class="toggler-button" id="rightPanelToggler">Expand/Collapse All</button>
+                 <p>This calculation estimates the memory footprint per GPU rank when using TP, PP, and EP, including gradients and optimizer states.</p>
+
+                 <div class="result-group">
+                    <button type="button" class="collapsible expanded">Layers Per Pipeline Rank: <span id="layersPerRank"></span></button>
+                    <div class="collapsible-content" id="detailsLayersPerRank"></div>
+                 </div>
+
+                 <div class="result-group">
+                    <button type="button" class="collapsible expanded">Memory Per Parallelized Layer Replica: <span id="memPerParallelLayerReplicaTotal"></span></button>
+                    <div class="collapsible-content" id="detailsMemPerParallelLayerReplica"></div>
+                 </div>
+
+                 <div id="ppStageContent"></div>
+
+
+                <p class="note" style="margin-top: 1.5rem;">This is a simplified estimate and may not account for all overheads, activation memory, or specific model architectures. Assumes AdamW optimizer with master FP32 weights (12 bytes per parameter) and FP16/BF16 gradients (4 bytes per parameter).</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function formatBytes(bytes, decimals = 2) {
+            if (bytes === 0) return '0 Bytes';
+            if (bytes < 1024) return bytes.toLocaleString() + ' Bytes'; // Show small values in Bytes
+
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k)); // Corrected to use Math.log
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i]; // Corrected to use Math.pow
+        }
+
+         // Function to format intermediate byte values without the "Bytes" string
+         function formatIntermediateBytes(bytes) {
+            if (bytes === 0) return '0';
+            // Ensure value is a number before formatting
+            if (typeof bytes !== 'number' || !isFinite(bytes)) {
+                return 'N/A'; // Handle non-finite results
+            }
+            // Round to nearest whole number for intermediate bytes
+            return Math.round(bytes).toLocaleString();
+         }
+
+         // Function to populate the Query Groups dropdown
+         function populateQueryGroups() {
+             const numHeadsSelect = document.getElementById('numHeads');
+             const queryGroupsSelect = document.getElementById('queryGroups');
+             const numHeads = parseInt(numHeadsSelect.value);
+
+             // Clear existing options
+             queryGroupsSelect.innerHTML = '';
+
+             // Add options that are powers of 2 and divisors of numHeads
+             for (let i = 1; i <= numHeads; i *= 2) {
+                 if (numHeads % i === 0) {
+                     const option = document.createElement('option');
+                     option.value = i;
+                     option.textContent = i;
+                     queryGroupsSelect.appendChild(option);
+                 }
+             }
+
+             // Select the largest possible value by default (MHA)
+             queryGroupsSelect.value = numHeads;
+         }
+
+
+        function calculate() {
+            console.log("Calculate function started.");
+
+            const vocab_size = parseInt(document.getElementById('vocabSize').value);
+            const hidden_size = parseInt(document.getElementById('hiddenSize').value);
+            const num_heads = parseInt(document.getElementById('numHeads').value);
+            const query_groups = parseInt(document.getElementById('queryGroups').value); // Get Query Groups value
+            const qkv_bias = document.getElementById('qkvBias').checked;
+            const norm_type = document.getElementById('normType').value;
+            const dense_intermediate = parseInt(document.getElementById('denseIntermediate').value);
+            const router_intermediate = parseInt(document.getElementById('routerIntermediate').value);
+            const shared_intermediate = parseInt(document.getElementById('sharedIntermediate').value);
+            const num_router_experts = parseInt(document.getElementById('numRouterExperts').value);
+            const num_shared_experts = parseInt(document.getElementById('numSharedExperts').value);
+            const num_layers = parseInt(document.getElementById('numLayers').value);
+            const tp_size = parseInt(document.getElementById('tpSize').value);
+            const pp_size = parseInt(document.getElementById('ppSize').value);
+            const ep_size = parseInt(document.getElementById('epSize').value);
+            const expert_tp_size = parseInt(document.getElementById('expertTPSize').value);
+            const enable_do = document.getElementById('enableDO').checked;
+            const dp_size = enable_do ? parseInt(document.getElementById('dpSize').value) : 1; // Default to 1 if DO is not enabled
+
+            console.log(`Inputs: vocabSize=${vocab_size}, hiddenSize=${hidden_size}, numHeads=${num_heads}, queryGroups=${query_groups}, qkvBias=${qkv_bias}, normType=${norm_type}, denseIntermediate=${dense_intermediate}, routerIntermediate=${router_intermediate}, sharedIntermediate=${shared_intermediate}, numRouterExperts=${num_router_experts}, numSharedExperts=${num_shared_experts}, numLayers=${num_layers}, tpSize=${tp_size}, ppSize=${pp_size}, epSize=${ep_size}, expertTPSize=${expert_tp_size}, enableDO=${enable_do}, dpSize=${dp_size}`);
+            console.log(`DO Enabled: ${enable_do}, DP Size: ${dp_size}`); // Explicit logging for DO and DP
+
+
+            const data_type_bytes = 2; // Assuming bfloat16 or float16 for parameters
+            const gradient_bytes = 4; // Assuming float32 for gradients
+            const optimizer_bytes = 12; // Assuming AdamW with master FP32 (exp_avg, exp_avg_sq, master_weight)
+
+
+            // Input validation checks
+            const head_dim = hidden_size / num_heads;
+            if (!Number.isInteger(head_dim)) {
+                alert("Error: hidden_size (" + hidden_size + ") must be divisible by number of heads (" + num_heads + ")");
+                return;
+            }
+             if (num_layers % pp_size !== 0) {
+                alert("Error: Total layers (" + num_layers + ") must be divisible by pipeline size (" + pp_size + ")");
+                return;
+            }
+             // Corrected Expert Parallelism validation to only check router experts
+             if (num_router_experts > 0 && ep_size > 0 && num_router_experts % ep_size !== 0) {
+                 alert("Error: Number of router experts (" + num_router_experts + ") must be divisible by expert parallelism size (" + ep_size + ")");
+                 return;
+            }
+             //if (expert_tp_size > tp_size) {
+             //    alert("Error: Expert TP size (" + expert_tp_size + ") cannot be greater than overall TP size (" + tp_size + ")");
+             //    return;
+             //}
+             //if (tp_size > 0 && expert_tp_size > 0 && tp_size % expert_tp_size !== 0) {
+             //    alert("Error: Overall TP size (" + tp_size + ") must be divisible by Expert TP size (" + expert_tp_size + ")");
+             //    return;
+             //}
+             if (tp_size > 0 && hidden_size % tp_size !== 0) {
+                alert("Error: Hidden size (" + hidden_size + ") must be divisible by TP size (" + tp_size + ")");
+                return;
+             }
+              if (dense_intermediate > 0 && tp_size > 0 && dense_intermediate % tp_size !== 0) {
+                 alert("Error: Dense Intermediate size (" + dense_intermediate + ") must be divisible by TP size (" + tp_size + ")");
+                 return;
+              }
+               if (router_intermediate > 0 && expert_tp_size > 0 && router_intermediate % expert_tp_size !== 0) { // Corrected variable name
+                 alert("Error: Router Intermediate size (" + router_intermediate + ") must be divisible by Expert TP size (" + expert_tp_size + ")");
+                 return;
+              }
+               if (shared_intermediate > 0 && expert_tp_size > 0 && shared_intermediate % expert_tp_size !== 0) {
+                 alert("Error: Shared Intermediate size (" + shared_intermediate + ") must be divisible by Expert TP size (" + expert_tp_size + ")");
+                 return;
+              }
+              // Word Embedding and Output Layer are sharded by TP over the vocab dimension
+              if (tp_size > 0 && vocab_size % tp_size !== 0) {
+                  alert("Error: Vocabulary size (" + vocab_size + ") must be divisible by TP size (" + tp_size + ")");
+                  return;
+              }
+              if (enable_do && dp_size > 1 && ep_size > 0 && num_router_experts > 0 && dp_size % ep_size !== 0) {
+                   alert("Error: DP Size (" + dp_size + ") must be divisible by EP Size (" + ep_size + ") when DO is enabled and router experts are used.");
+                   return;
+              }
+               if (enable_do && dp_size > 1 && num_router_experts === 0 && total_param_count % dp_size !== 0) {
+                   // Simplified check for non-MoE models with DO
+                   // This is a rough check; actual sharding depends on how parameters are grouped.
+                   // A more precise check would be needed for complex sharding schemes.
+                   console.warn("Warning: Total parameter count may not be perfectly divisible by DP size. Optimizer state sharding might be uneven.");
+               }
+               if (num_heads % query_groups !== 0) {
+                   alert("Error: Number of Attention Heads (" + num_heads + ") must be divisible by Query Groups (" + query_groups + ")");
+                   return;
+               }
+
+
+            // Word Embedding
+            const param_word_embedding = vocab_size * hidden_size;
+            const memory_word_embedding_params = param_word_embedding * data_type_bytes;
+
+
+            // Norm Parameters
+            function calculateNormParams(normType) {
+                if (normType === 'layernorm') {
+                    return { param: hidden_size * 2, memory_params: hidden_size * 2 * data_type_bytes };
+                } else { // rmsnorm
+                    return { param: hidden_size, memory_params: hidden_size * data_type_bytes };
+                }
+            }
+
+            const pre_attn_norm = calculateNormParams(norm_type);
+            const post_attn_norm = calculateNormParams(norm_type);
+            const output_norm = calculateNormParams(norm_type); // Assuming a final norm before output layer
+
+
+            // QKV Projection (Updated for GQA)
+            const q_proj_params = hidden_size * num_heads * head_dim;
+            const k_proj_params = hidden_size * query_groups * head_dim; // K projection uses query_groups
+            const v_proj_params = k_proj_params; // V projection uses query_groups
+
+            const q_bias_params = qkv_bias ? num_heads * head_dim : 0;
+            const k_bias_params = qkv_bias ? query_groups * head_dim : 0; // K bias uses query_groups
+            const v_bias_params = qkv_bias ? query_groups * head_dim : 0; // V bias uses query_groups
+
+            const total_qkv_params = q_proj_params + k_proj_params + v_proj_params + q_bias_params + k_bias_params + v_bias_params;
+            const memory_qkv_params = total_qkv_params * data_type_bytes;
+
+
+            // Attention Output (Projection back to hidden_size)
+            const param_attn_output = hidden_size * hidden_size; // Moved calculation up
+            const memory_attn_output_params = param_attn_output * data_type_bytes; // Moved calculation up
+
+
+            // MLP Components (considering FFN or MoE)
+            let param_dense = 0;
+            let memory_dense_params = 0;
+            if (dense_intermediate > 0) {
+                 param_dense = hidden_size * dense_intermediate * 3; // Follows original code logic
+                 memory_dense_params = param_dense * data_type_bytes;
+            }
+
+            let param_router_experts = 0;
+            let memory_router_experts_params = 0;
+            if (num_router_experts > 0 && router_intermediate > 0) {
+                 param_router_experts = hidden_size * router_intermediate * 3 * num_router_experts;
+                 memory_router_experts_params = param_router_experts * data_type_bytes;
+            }
+
+            let param_shared_experts = 0;
+            let memory_shared_experts_params = 0;
+             if (num_shared_experts > 0 && shared_intermediate > 0) {
+                 param_shared_experts = hidden_size * shared_intermediate * 3 * num_shared_experts;
+                 memory_shared_experts_params = param_shared_experts * data_type_bytes;
+            }
+
+            const param_moe_router = hidden_size * num_router_experts;
+            const memory_moe_router_params = param_moe_router * data_type_bytes; // Router is often float32, but using data_type_bytes for consistency in parameter count
+
+            const param_shared_gate = num_shared_experts > 0 ? hidden_size * num_shared_experts : 0;
+            const memory_shared_gate_params = param_shared_gate * data_type_bytes; // Assuming router data type
+
+
+            const total_mlp_params = param_dense + param_router_experts + param_shared_experts + param_shared_gate + param_moe_router;
+            const total_mlp_memory_params = memory_dense_params + memory_router_experts_params + memory_shared_experts_params + memory_shared_gate_params + memory_moe_router_params;
+
+
+            // Per Layer Parameters (Self-Attention + MLP + Norms)
+            // Assuming Pre- and Post-attention norms, and a Post-MLP norm
+            const per_layer_params = pre_attn_norm.param + total_qkv_params + param_attn_output + post_attn_norm.param + total_mlp_params;
+            const per_layer_memory_params = pre_attn_norm.memory_params + memory_qkv_params + memory_attn_output_params + post_attn_norm.memory_params + total_mlp_memory_params;
+
+
+            // Output layer is typically vocab_size * hidden_size
+            const param_output_layer = vocab_size * hidden_size;
+            const memory_output_layer_params = param_output_layer * data_type_bytes;
+
+
+            // Total Parameters and Memory (Full Model, Unsharded)
+            const total_memory_params_full = memory_word_embedding_params + (per_layer_memory_params * num_layers) + output_norm.memory_params + memory_output_layer_params;
+            const total_param_count = total_memory_params_full / data_type_bytes;
+
+            console.log(`Total params full (bytes): ${total_memory_params_full}, count: ${total_param_count}`);
+
+            // Calculate total non-expert and expert parameters for the full model (moved outside PP check)
+            const total_non_expert_params_full = param_word_embedding +
+                                                (pre_attn_norm.param * num_layers) +
+                                                (q_proj_params * num_layers) + // Q params
+                                                (param_attn_output * num_layers) + // Attn Output params
+                                                (post_attn_norm.param * num_layers) +
+                                                (param_dense * num_layers) +
+                                                (param_shared_experts * num_layers) +
+                                                (param_shared_gate * num_layers) +
+                                                (param_moe_router * num_layers) +
+                                                output_norm.param +
+                                                param_output_layer;
+
+            // Total expert parameters for full model (router experts across all layers)
+            const total_expert_params_full = (k_proj_params + v_proj_params + k_bias_params + v_bias_params) * num_layers + // K/V params are expert in GQA/MQA
+                                             param_router_experts * num_layers; // Router experts
+
+            const total_non_expert_memory_params_full = total_non_expert_params_full * data_type_bytes;
+            const total_expert_memory_params_full = total_expert_params_full * data_type_bytes;
+
+            console.log(`Total Full Params Non-Expert (Bytes): ${total_non_expert_memory_params_full}`);
+            console.log(`Total Full Params Expert (Bytes): ${total_expert_memory_params_full}`);
+
+
+            // Populate Middle Panel (keep this part separate as it's always the same structure)
+            const totalParamCountSpan = document.getElementById('totalParamCount');
+            const totalMemoryFullSpan = document.getElementById('totalMemoryFull');
+            const memWordEmbeddingSpan = document.getElementById('memWordEmbedding');
+            const detailsWordEmbeddingDiv = document.getElementById('detailsWordEmbedding');
+            const memNormSpan = document.getElementById('memNorm');
+            const detailsNormDiv = document.getElementById('detailsNorm');
+            const memQkvSpan = document.getElementById('memQkv');
+            const detailsQkvDiv = document.getElementById('detailsQkv');
+            const memAttnOutputSpan = document.getElementById('memAttnOutput');
+            const detailsAttnOutputDiv = document.getElementById('detailsAttnOutput');
+            const memTotalMlpSpan = document.getElementById('memTotalMlp');
+            const detailsMlpDiv = document.getElementById('detailsMlp');
+            const memPerLayerSpan = document.getElementById('memPerLayer');
+            const detailsPerLayerDiv = document.getElementById('detailsPerLayer');
+            const memOutputNormSpan = document.getElementById('memOutputNorm');
+            const detailsOutputNormDiv = document.getElementById('detailsOutputNorm');
+            const memOutputLayerSpan = document.getElementById('memOutputLayer');
+            const detailsOutputLayerDiv = document.getElementById('detailsOutputLayer');
+            const memTotalFullSpan = document.getElementById('memTotalFull');
+            const detailsTotalFullDiv = document.getElementById('detailsTotalFull');
+            const headDimSpan = document.getElementById('headDim');
+            const detailsHeadDimDiv = document.getElementById('detailsHeadDim');
+
+
+            if (totalParamCountSpan) totalParamCountSpan.textContent = total_param_count.toLocaleString();
+            if (totalMemoryFullSpan) totalMemoryFullSpan.textContent = `${total_memory_params_full.toLocaleString()} Bytes (~${formatBytes(total_memory_params_full)})`;
+            console.log(`Populated totalParamCount and totalMemoryFull`);
+
+
+            if (memWordEmbeddingSpan) memWordEmbeddingSpan.textContent = `${memory_word_embedding_params.toLocaleString()} Bytes`;
+            if (detailsWordEmbeddingDiv) detailsWordEmbeddingDiv.innerHTML = `
+${vocab_size.toLocaleString()} * ${hidden_size} * ${data_type_bytes} = ${formatIntermediateBytes(memory_word_embedding_params)}\n<span class="annotation">Result in Bytes (Parameters)</span>`; // Removed <p>, added \n
+
+            if (memNormSpan) memNormSpan.textContent = `${pre_attn_norm.memory_params.toLocaleString()} Bytes`; // Showing per-norm size
+            if (detailsNormDiv) detailsNormDiv.innerHTML = `
+${norm_type === 'layernorm' ? `${hidden_size} * 2` : hidden_size} * ${data_type_bytes} = ${formatIntermediateBytes(pre_attn_norm.memory_params)}\n<span class="annotation">Result in Bytes (Parameters)</span>`; // Removed <p>, added \n
+
+
+            if (memQkvSpan) memQkvSpan.textContent = `${memory_qkv_params.toLocaleString()} Bytes`;
+            if (detailsQkvDiv) detailsQkvDiv.innerHTML = `
+Q: ${hidden_size} * ${head_dim} * ${num_heads}${qkv_bias ? ` + ${num_heads} * ${head_dim}` : ''} = ${(q_proj_params + q_bias_params).toLocaleString()} params\nK: ${hidden_size} * ${head_dim} * ${query_groups}${qkv_bias ? ` + ${query_groups} * ${head_dim}` : ''} = ${(k_proj_params + k_bias_params).toLocaleString()} params\nV: ${hidden_size} * ${head_dim} * ${query_groups}${qkv_bias ? ` + ${query_groups} * ${head_dim}` : ''} = ${(v_proj_params + v_bias_params).toLocaleString()} params\nTotal QKV: ${total_qkv_params.toLocaleString()} params * ${data_type_bytes} = ${memory_qkv_params.toLocaleString()} Bytes (~${formatBytes(memory_qkv_params)})`.trim() + `\n<span class="annotation">Result in Bytes (Parameters)</span>`; // Removed <p>, added \n
+
+            if (memAttnOutputSpan) memAttnOutputSpan.textContent = `${memory_attn_output_params.toLocaleString()} Bytes`;
+            if (detailsAttnOutputDiv) detailsAttnOutputDiv.innerHTML = `
+${hidden_size} * ${hidden_size} * ${data_type_bytes} = ${formatIntermediateBytes(memory_attn_output_params)}\n<span class="annotation">Result in Bytes (Parameters)</span>`; // Removed <p>, added \n
+
+
+            if (memTotalMlpSpan) memTotalMlpSpan.textContent = `${total_mlp_memory_params.toLocaleString()} Bytes`;
+            if (detailsMlpDiv) detailsMlpDiv.innerHTML = `
+Dense FFN: ${hidden_size} * ${dense_intermediate} * 3 * ${data_type_bytes} = ${formatIntermediateBytes(memory_dense_params)}\nRouter Experts: ${hidden_size} * ${router_intermediate} * 3 * ${num_router_experts} * ${data_type_bytes} = ${formatIntermediateBytes(memory_router_experts_params)}\nShared Experts: ${hidden_size} * ${shared_intermediate} * 3 * ${num_shared_experts} * ${data_type_bytes} = ${formatIntermediateBytes(memory_shared_experts_params)}\nShared Gate: ${param_shared_gate.toLocaleString()} params * ${data_type_bytes} = ${formatIntermediateBytes(memory_shared_gate_params)}\nMoE Router: ${hidden_size} * ${num_router_experts} * ${data_type_bytes} = ${formatIntermediateBytes(memory_moe_router_params)}\nTotal MLP: ${total_mlp_memory_params.toLocaleString()} Bytes (~${formatBytes(total_mlp_memory_params)})`.trim() + `\n<span class="annotation">Result in Bytes (Parameters)</span>`; // Removed <p>, added \n
+
+             if (memPerLayerSpan) memPerLayerSpan.textContent = `${per_layer_memory_params.toLocaleString()} Bytes`;
+             if (detailsPerLayerDiv) detailsPerLayerDiv.innerHTML = `
+PAN + QKVP + AO + PAN + MLP\n= ${formatIntermediateBytes(pre_attn_norm.memory_params)} + ${formatIntermediateBytes(memory_qkv_params)} + ${formatIntermediateBytes(memory_attn_output_params)} + ${formatIntermediateBytes(post_attn_norm.memory_params)} + ${formatIntermediateBytes(total_mlp_memory_params)}\n= ${per_layer_memory_params.toLocaleString()} Bytes (~${formatBytes(per_layer_memory_params)})\n<span class="annotation">Result in Bytes (Parameters) | PAN: Pre/Post-Attn Norm | QKVP: QKV Projection | AO: Attention Output | MLP: FFN / MoE Layers</span>`.trim(); // Removed <p>, added \n
+
+             if (memOutputNormSpan) memOutputNormSpan.textContent = `${output_norm.memory_params.toLocaleString()} Bytes`;
+             if (detailsOutputNormDiv) detailsOutputNormDiv.innerHTML = `
+${norm_type === 'layernorm' ? `${hidden_size} * 2` : hidden_size} * ${data_type_bytes} = ${formatIntermediateBytes(output_norm.memory_params)}\n<span class="annotation">Result in Bytes (Parameters)</span>`; // Removed <p>, added \n
+
+
+             if (memOutputLayerSpan) memOutputLayerSpan.textContent = `${memory_output_layer_params.toLocaleString()} Bytes`;
+             if (detailsOutputLayerDiv) detailsOutputLayerDiv.innerHTML = `
+${vocab_size.toLocaleString()} * ${hidden_size} * ${data_type_bytes} = ${formatIntermediateBytes(memory_output_layer_params)}\n<span class="annotation">Result in Bytes (Parameters)</span>`; // Removed <p>, added \n
+
+
+             if (memTotalFullSpan) memTotalFullSpan.textContent = `${total_memory_params_full.toLocaleString()} Bytes (~${formatBytes(total_memory_params_full)})`;
+             if (detailsTotalFullDiv) detailsTotalFullDiv.innerHTML = `
+WE + (PL * NL) + ON + OL\n= ${formatIntermediateBytes(memory_word_embedding_params)} + (${formatIntermediateBytes(per_layer_memory_params)} * ${num_layers}) + ${formatIntermediateBytes(output_norm.memory_params)} + ${formatIntermediateBytes(memory_output_layer_params)}\n= ${total_memory_params_full.toLocaleString()} Bytes (~${formatBytes(total_memory_params_full)})\n<span class="annotation">Result in Bytes (Parameters) | WE: Word Embedding | PL: Per-Layer Memory | NL: Number of Layers | ON: Output Norm | OL: Output Layer</span>`.trim(); // Added annotation
+
+             if (headDimSpan) headDimSpan.textContent = head_dim;
+             if (detailsHeadDimDiv) detailsHeadDimDiv.innerHTML = `hidden_size / num_heads = ${hidden_size} / ${num_heads} = ${head_dim}`; /* Removed <p> tag */
+
+             console.log("Middle panel populated.");
+
+
+            // Parallelism Calculations
+
+            // Memory per layer replica after TP and EP sharding (Parameters only)
+            // This is the parameter memory footprint of ONE layer on ONE rank within a PP stage
+             const memory_per_parallel_layer_replica_params_non_expert_bytes = pre_attn_norm.memory_params + // Norms are replicated
+                                               (tp_size > 0 ? (q_proj_params + q_bias_params) * data_type_bytes / tp_size : 0) + // Q projection sharded by TP
+                                               (tp_size > 0 ? memory_attn_output_params / tp_size : 0) + // Attention Output sharded by TP (hidden_size dimension)
+                                               post_attn_norm.memory_params + // Norms are replicated
+                                               (tp_size > 0 ? memory_dense_params / tp_size : 0) + // Dense FFN sharded by TP (hidden_size dimension)
+                                               (tp_size > 0 ? memory_shared_experts_params / tp_size : 0) + // Shared experts sharded by TP only (intermediate dim)
+                                               memory_shared_gate_params + // Shared gate not sharded by TP (replicated)
+                                               memory_moe_router_params; // MoE router not sharded by TP (replicated)
+
+            const memory_per_parallel_layer_replica_params_expert_bytes = (expert_tp_size > 0 && ep_size > 0 ? (k_proj_params + v_proj_params + k_bias_params + v_bias_params) * data_type_bytes / (expert_tp_size * ep_size) : 0) + // K/V sharded by Expert TP and EP
+                                                                         (expert_tp_size > 0 && ep_size > 0 ? memory_router_experts_params / (expert_tp_size * ep_size) : 0); // Router experts sharded by Expert TP and EP
+
+
+            console.log(`Layer Replica Params Non-Expert (Bytes): ${memory_per_parallel_layer_replica_params_non_expert_bytes}`);
+            console.log(`Layer Replica Params Expert (Bytes): ${memory_per_parallel_layer_replica_params_expert_bytes}`);
+
+
+            // Calculate Gradient and Optimizer Memory for a Layer Replica
+            const memory_per_parallel_layer_replica_gradients = memory_per_parallel_layer_replica_params_non_expert_bytes * (gradient_bytes / data_type_bytes) + memory_per_parallel_layer_replica_params_expert_bytes * (gradient_bytes / data_type_bytes); // Gradients are not sharded by DO
+
+            let memory_per_parallel_layer_replica_optimizer;
+             if (enable_do && dp_size > 1) { // Only shard if DO is enabled AND DP size > 1
+                 // Optimizer states sharded by DO
+                 const expert_do_sharding_factor = (ep_size > 0 && dp_size > 0) ? (dp_size / ep_size) : 1; // Avoid division by zero or zero EP/DP
+                 console.log(`Layer Replica Optimizer: Sharding enabled. DP Size: ${dp_size}, EP Size: ${ep_size}, Expert DO Sharding Factor: ${expert_do_sharding_factor}`);
+
+                 memory_per_parallel_layer_replica_optimizer = (memory_per_parallel_layer_replica_params_non_expert_bytes * (optimizer_bytes / data_type_bytes) / dp_size) +
+                                                              (memory_per_parallel_layer_replica_params_expert_bytes * (optimizer_bytes / data_type_bytes) / expert_do_sharding_factor); // Corrected sharding factor for expert params
+             } else {
+                 // Optimizer states not sharded by DO (either DO is off or DP=1)
+                 console.log(`Layer Replica Optimizer: Sharding disabled. DO enabled: ${enable_do}, DP Size: ${dp_size}`);
+                 memory_per_parallel_layer_replica_optimizer = (memory_per_parallel_layer_replica_params_non_expert_bytes + memory_per_parallel_layer_replica_params_expert_bytes) * (optimizer_bytes / data_type_bytes);
+             }
+            console.log(`Layer Replica Optimizer Memory (Bytes): ${memory_per_parallel_layer_replica_optimizer}`);
+
+
+            const memory_per_parallel_layer_replica_params_total = memory_per_parallel_layer_replica_params_non_expert_bytes + memory_per_parallel_layer_replica_params_expert_bytes;
+            const memory_per_parallel_layer_replica_total = memory_per_parallel_layer_replica_params_total + memory_per_parallel_layer_replica_gradients + memory_per_parallel_layer_replica_optimizer;
+
+
+            const layers_per_rank = num_layers / pp_size;
+
+
+            // Get the div where PP stage content will be inserted
+            const ppStageContentDiv = document.getElementById('ppStageContent');
+            let ppStageHtml = ''; // Use a temporary string to build the HTML
+
+            // Calculate PP stage memories (needed for PP > 1 population)
+            // These calculations now include parameters, gradients, and optimizer states
+
+            // Parameter memory for each stage (sharded by TP/EP)
+            // Non-expert parameters for PP stages
+            const pp_first_stage_params_non_expert_bytes = (tp_size > 0 ? memory_word_embedding_params / tp_size : 0) + (memory_per_parallel_layer_replica_params_non_expert_bytes * layers_per_rank);
+            const pp_intermediate_stage_params_non_expert_bytes = memory_per_parallel_layer_replica_params_non_expert_bytes * layers_per_rank;
+            const pp_last_stage_params_non_expert_bytes = (memory_per_parallel_layer_replica_params_non_expert_bytes * layers_per_rank) + (tp_size > 0 ? output_norm.memory_params / tp_size : 0) + (tp_size > 0 ? memory_output_layer_params / tp_size : 0);
+
+            // Expert parameters for PP stages
+            const pp_first_stage_params_expert_bytes = memory_per_parallel_layer_replica_params_expert_bytes * layers_per_rank; // Expert part of layers
+            const pp_intermediate_stage_params_expert_bytes = memory_per_parallel_layer_replica_params_expert_bytes * layers_per_rank;
+            const pp_last_stage_params_expert_bytes = memory_per_parallel_layer_replica_params_expert_bytes * layers_per_rank; // Expert part of layers
+
+
+            const pp_first_stage_memory_params = pp_first_stage_params_non_expert_bytes + pp_first_stage_params_expert_bytes;
+            const pp_intermediate_stage_memory_params = pp_intermediate_stage_params_non_expert_bytes + pp_intermediate_stage_params_expert_bytes;
+            const pp_last_stage_memory_params = pp_last_stage_params_non_expert_bytes + pp_last_stage_params_expert_bytes;
+
+
+             // Gradient memory for each stage (sharded by TP/EP, not DO)
+             const memory_word_embedding_gradients = memory_word_embedding_params * (gradient_bytes / data_type_bytes);
+             const memory_output_norm_gradients = output_norm.memory_params * (gradient_bytes / data_type_bytes);
+             const memory_output_layer_gradients = memory_output_layer_params * (gradient_bytes / data_type_bytes);
+
+             const pp_first_stage_memory_gradients = (tp_size > 0 ? memory_word_embedding_gradients / tp_size : 0) + (memory_per_parallel_layer_replica_gradients * layers_per_rank);
+             const pp_intermediate_stage_memory_gradients = memory_per_parallel_layer_replica_gradients * layers_per_rank;
+             const pp_last_stage_memory_gradients = (memory_per_parallel_layer_replica_gradients * layers_per_rank) + (tp_size > 0 ? memory_output_norm_gradients / tp_size : 0) + (tp_size > 0 ? memory_output_layer_gradients / tp_size : 0);
+
+
+            // Optimizer memory for each stage (sharded by TP/EP and DO)
+            let pp_first_stage_memory_optimizer, pp_intermediate_stage_memory_optimizer, pp_last_stage_memory_optimizer;
+
+             if (enable_do && dp_size > 1) { // Only shard if DO is enabled AND DP size > 1
+                 // Optimizer states sharded by DO
+                 const expert_do_sharding_factor = (ep_size > 0 && dp_size > 0) ? (dp_size / ep_size) : 1;
+                 console.log(`PP Stage Optimizer: Sharding enabled. DP Size: ${dp_size}, EP Size: ${ep_size}, Expert DO Sharding Factor: ${expert_do_sharding_factor}`);
+
+                 pp_first_stage_memory_optimizer = (pp_first_stage_params_non_expert_bytes * (optimizer_bytes / data_type_bytes) / dp_size) +
+                                                     (pp_first_stage_params_expert_bytes * (optimizer_bytes / data_type_bytes) / expert_do_sharding_factor); // Corrected sharding factor for expert params
+
+                 console.log(`PP First Stage Params Non-Expert (Bytes): ${pp_first_stage_params_non_expert_bytes}`);
+                 console.log(`PP First Stage Params Expert (Bytes): ${pp_first_stage_params_expert_bytes}`);
+                 console.log(`PP First Stage Optimizer Memory (Bytes): ${pp_first_stage_memory_optimizer}`);
+
+
+                 // Calculate non-expert and expert parameter memory for intermediate stages
+                 pp_intermediate_stage_memory_optimizer = (pp_intermediate_stage_params_non_expert_bytes * (optimizer_bytes / data_type_bytes) / dp_size) +
+                                                           (pp_intermediate_stage_params_expert_bytes * (optimizer_bytes / data_type_bytes) / expert_do_sharding_factor); // Corrected sharding factor for expert params
+                 console.log(`PP Intermediate Stage Params Non-Expert (Bytes): ${pp_intermediate_stage_params_non_expert_bytes}`);
+                 console.log(`PP Intermediate Stage Params Expert (Bytes): ${pp_intermediate_stage_params_expert_bytes}`);
+                 console.log(`PP Intermediate Stage Optimizer Memory (Bytes): ${pp_intermediate_stage_memory_optimizer}`);
+
+
+                 // Calculate non-expert and expert parameter memory for the last stage
+                 pp_last_stage_memory_optimizer = (pp_last_stage_params_non_expert_bytes * (optimizer_bytes / data_type_bytes) / dp_size) +
+                                                   (pp_last_stage_params_expert_bytes * (optimizer_bytes / data_type_bytes) / expert_do_sharding_factor); // Corrected sharding factor for expert params
+                 console.log(`PP Last Stage Params Non-Expert (Bytes): ${pp_last_stage_params_non_expert_bytes}`);
+                 console.log(`PP Last Stage Params Expert (Bytes): ${pp_last_stage_params_expert_bytes}`);
+                 console.log(`PP Last Stage Optimizer Memory (Bytes): ${pp_last_stage_memory_optimizer}`);
+
+
+             } else {
+                 // Optimizer states not sharded by DO (either DO is off or DP=1)
+                 console.log(`PP Stage Optimizer: Sharding disabled. DO enabled: ${enable_do}, DP Size: ${dp_size}`);
+                 pp_first_stage_memory_optimizer = pp_first_stage_memory_params * (optimizer_bytes / data_type_bytes);
+                 pp_intermediate_stage_memory_optimizer = pp_intermediate_stage_memory_params * (optimizer_bytes / data_type_bytes);
+                 pp_last_stage_memory_optimizer = pp_last_stage_memory_params * (optimizer_bytes / data_type_bytes);
+             }
+
+
+            // Total memory for each stage
+            const pp_first_stage_memory_total = pp_first_stage_memory_params + pp_first_stage_memory_gradients + pp_first_stage_memory_optimizer;
+            const pp_intermediate_stage_memory_total = pp_intermediate_stage_memory_params + pp_intermediate_stage_memory_gradients + pp_intermediate_stage_memory_optimizer;
+            const pp_last_stage_memory_total = pp_last_stage_memory_params + pp_last_stage_memory_gradients + pp_last_stage_memory_optimizer;
+
+
+            if (pp_size === 1) {
+                // Case 1: PP = 1 (Single Stage) - Calculate total memory on this rank
+                 // Calculate non-expert and expert parameter memory for the PP=1 rank
+                 const total_non_expert_memory_per_rank_pp1 =
+                     (tp_size > 0 ? memory_word_embedding_params / tp_size : 0) + // Word Embedding sharded by TP
+                     (pre_attn_norm.memory_params * num_layers) + // Pre-Attn Norm replicated per layer
+                     (tp_size > 0 ? (q_proj_params + q_bias_params) * data_type_bytes / tp_size : 0) * num_layers + // QKV sharded by TP per layer
+                     (tp_size > 0 ? memory_attn_output_params / tp_size : 0) * num_layers + // Attn Output sharded by TP per layer
+                     (post_attn_norm.memory_params * num_layers) + // Post-Attn Norm replicated per layer
+                     (tp_size > 0 ? memory_dense_params / tp_size : 0) * num_layers + // Dense FFN sharded by TP per layer
+                     (tp_size > 0 ? memory_shared_experts_params / tp_size : 0) * num_layers + // Shared Experts sharded by TP per layer
+                     memory_shared_gate_params * num_layers + // Shared Gate replicated per layer
+                     memory_moe_router_params * num_layers + // MoE Router replicated per layer
+                     (tp_size > 0 ? output_norm.memory_params / tp_size : 0) + // Output Norm sharded by TP
+                     (tp_size > 0 ? memory_output_layer_params / tp_size : 0); // Output Layer sharded by TP
+
+                 const total_expert_memory_per_rank_pp1 =
+                     (expert_tp_size > 0 && ep_size > 0 ? (k_proj_params + v_proj_params + k_bias_params + v_bias_params) * data_type_bytes / (expert_tp_size * ep_size) : 0) * num_layers + // K/V sharded by Expert TP and EP per layer
+                     (expert_tp_size > 0 && ep_size > 0 ? memory_router_experts_params / (expert_tp_size * ep_size) : 0) * num_layers; // Router Experts sharded by Expert TP and EP per layer
+
+
+                 const total_memory_per_rank_pp1_params = total_non_expert_memory_per_rank_pp1 + total_expert_memory_per_rank_pp1;
+
+
+                 const total_memory_per_rank_pp1_gradients = total_memory_per_rank_pp1_params * (gradient_bytes / data_type_bytes);
+
+                 let total_memory_per_rank_pp1_optimizer;
+                 if (enable_do && dp_size > 1) { // Only shard if DO is enabled AND DP size > 1
+                      // Optimizer states sharded by DO
+                      const expert_do_sharding_factor = (ep_size > 0 && dp_size > 0) ? (dp_size / ep_size) : 1;
+
+                      total_memory_per_rank_pp1_optimizer =
+                          (total_non_expert_memory_per_rank_pp1 * (optimizer_bytes / data_type_bytes) / dp_size) +
+                          (total_expert_memory_per_rank_pp1 * (optimizer_bytes / data_type_bytes) / expert_do_sharding_factor);
+
+                     console.log(`PP=1 Optimizer Memory (Bytes): Sharding enabled. DP Size: ${dp_size}, EP Size: ${ep_size}, Expert DO Sharding Factor: ${expert_do_sharding_factor}, Result: ${total_memory_per_rank_pp1_optimizer}`);
+
+
+                 } else {
+                     // Optimizer states not sharded by DO (either DO is off or DP=1)
+                     console.log(`PP=1 Optimizer Memory (Bytes): Sharding disabled. DO enabled: ${enable_do}, DP Size: ${dp_size}`);
+                     total_memory_per_rank_pp1_optimizer = total_memory_per_rank_pp1_params * (optimizer_bytes / data_type_bytes);
+                     console.log(`PP=1 Optimizer Memory (Bytes): Unsharded Result: ${total_memory_per_rank_pp1_optimizer}`);
+
+                 }
+
+
+                 const total_memory_per_rank_pp1_total = total_memory_per_rank_pp1_params + total_memory_per_rank_pp1_gradients + total_memory_per_rank_pp1_optimizer;
+
+
+                 ppStageHtml = `
+                     <div class="result-group">
+                         <button type="button" class="collapsible expanded">PP Stage Memory (PP=1): ${total_memory_per_rank_pp1_total.toLocaleString()} Bytes (~${formatBytes(total_memory_per_rank_pp1_total)})</button>
+                         <div class="collapsible-content">
+                             Parameters:\nTotal Parameter memory on a single rank with PP=1 (full model, sharded by TP/EP):\n(WE / TP) + (PL * NL) + (ON / TP) + (OL / TP)\n= ${formatIntermediateBytes(tp_size > 0 ? memory_word_embedding_params / tp_size : 0)} + ${formatIntermediateBytes(memory_per_parallel_layer_replica_params_total * num_layers)} + ${formatIntermediateBytes(tp_size > 0 ? output_norm.memory_params / tp_size : 0)} + ${formatIntermediateBytes(tp_size > 0 ? memory_output_layer_params / tp_size : 0)}\n= ${total_memory_per_rank_pp1_params.toLocaleString()} Bytes (~${formatBytes(total_memory_per_rank_pp1_params)})
+                             \n\nGradients:\n= Parameter Memory * ${gradient_bytes / data_type_bytes}\n= ${total_memory_per_rank_pp1_params.toLocaleString()} * ${gradient_bytes / data_type_bytes}\n= ${total_memory_per_rank_pp1_gradients.toLocaleString()} Bytes (~${formatBytes(total_memory_per_rank_pp1_gradients)})
+                             \n\nOptimizer:\n`;
+                             if (enable_do && dp_size > 1) {
+                                  const expert_do_sharding_factor = (ep_size > 0 && dp_size > 0) ? (dp_size / ep_size) : 1;
+                                  ppStageHtml += `= (Total Non-Expert Parameter Memory (PP=1 Rank) * ${optimizer_bytes / data_type_bytes} / DP Size) + (Total Sharded Expert Parameter Memory (PP=1 Rank) * ${optimizer_bytes / data_type_bytes} / (DP Size / EP Size))\n`; // Corrected explanation string
+                                  ppStageHtml += `= (${formatIntermediateBytes(total_non_expert_memory_per_rank_pp1)} * ${optimizer_bytes / data_type_bytes} / ${dp_size}) + (${formatIntermediateBytes(total_expert_memory_per_rank_pp1)} * ${optimizer_bytes / data_type_bytes} / ${expert_do_sharding_factor})\n`;
+                                  ppStageHtml += `= ${formatIntermediateBytes(total_non_expert_memory_per_rank_pp1 * optimizer_bytes / data_type_bytes / dp_size)} + ${formatIntermediateBytes(total_expert_memory_per_rank_pp1 * optimizer_bytes / data_type_bytes / expert_do_sharding_factor)}\n`;
+                             } else {
+                                  ppStageHtml += `= Total Parameter Memory (PP=1 Rank) * ${optimizer_bytes / data_type_bytes}\n`;
+                                  ppStageHtml += `= ${formatIntermediateBytes(total_memory_per_rank_pp1_params)} * ${optimizer_bytes / data_type_bytes}\n`;
+                             }
+                              ppStageHtml += `= ${total_memory_per_rank_pp1_optimizer.toLocaleString()} Bytes (~${formatBytes(total_memory_per_rank_pp1_optimizer)})
+                             \n\nTotal Memory:\n= Parameters + Gradients + Optimizer States\n= ${total_memory_per_rank_pp1_params.toLocaleString()} + ${total_memory_per_rank_pp1_gradients.toLocaleString()} + ${total_memory_per_rank_pp1_optimizer.toLocaleString()}\n= ${total_memory_per_rank_pp1_total.toLocaleString()} Bytes (~${formatBytes(total_memory_per_rank_pp1_total)})
+                             \n<span class="annotation">WE: Word Embedding | PL: Per Layer | NL: Number of Layers | ON: Output Norm | OL: Output Layer | TP: Tensor Parallelism | DP: Data Parallelism | EP: Expert Parallelism</span>
+                         </div>
+                     </div>
+                 `;
+
+            } else {
+                // Case 2: PP > 1 (Multiple Stages) - Show breakdown by stage
+                 ppStageHtml = `
+                     <div class="result-group">
+                         <button type="button" class="collapsible expanded">PP First Stage Memory: <span id="memPpFirstStage"></span></button>
+                         <div class="collapsible-content" id="detailsPpFirstStage"></div>
+                     </div>
+
+                    <div class="result-group" id="intermediateStageGroup">
+                        <button type="button" class="collapsible expanded">PP Intermediate Stages Memory (x<span id="numIntermediateStages"></span>): <span id="memPpIntermediateStages"></span></button>
+                        <div class="collapsible-content" id="detailsPpIntermediateStages"></div>
+                    </div>
+
+                     <div class="result-group">
+                         <button type="button" class="collapsible expanded">PP Last Stage Memory: <span id="memPpLastStage"></span></button>
+                         <div class="collapsible-content" id="detailsPpLastStage"></div>
+                     </div>
+                 `;
+                 // Note: Population of these elements happens AFTER innerHTML is set
+            }
+
+            // Set the generated PP stage HTML content
+            ppStageContentDiv.innerHTML = ppStageHtml;
+
+            // Re-setup collapsible listeners for the newly added content
+            setupCollapsibleListeners();
+
+
+             // Populate elements that are always present (Layers Per Rank, Mem Per Parallelized Layer Replica)
+             const layersPerRankSpan = document.getElementById('layersPerRank');
+             const detailsLayersPerRankDiv = document.getElementById('detailsLayersPerRank');
+             const memPerParallelLayerReplicaTotalSpan = document.getElementById('memPerParallelLayerReplicaTotal');
+             const detailsMemPerParallelLayerReplicaDiv = document.getElementById('detailsMemPerParallelLayerReplica');
+
+
+             if (layersPerRankSpan) layersPerRankSpan.textContent = layers_per_rank;
+             if (detailsLayersPerRankDiv) detailsLayersPerRankDiv.innerHTML = `Total Layers (${num_layers}) / PP Size (${pp_size}) = ${layers_per_rank}`; /* Removed <p> tag */
+
+             // Update Memory Per Parallelized Layer Replica section
+             if (memPerParallelLayerReplicaTotalSpan) memPerParallelLayerReplicaTotalSpan.textContent = `${memory_per_parallel_layer_replica_total.toLocaleString()} Bytes (~${formatBytes(memory_per_parallel_layer_replica_total)})`;
+             if (detailsMemPerParallelLayerReplicaDiv) detailsMemPerParallelLayerReplicaDiv.innerHTML = `\
+Parameters:\nPAN + (Q / TP) + (K/V / (Expert TP * EP)) + AO + PAN + (Dense FFN / TP) + (Router Experts / (Expert TP * EP)) + (Shared Experts / TP) + Shared Gate + MoE Router\n= ${formatIntermediateBytes(pre_attn_norm.memory_params)} + ${formatIntermediateBytes(tp_size > 0 ? (q_proj_params + q_bias_params) * data_type_bytes / tp_size : 0)} + ${formatIntermediateBytes(expert_tp_size > 0 && ep_size > 0 ? (k_proj_params + v_proj_params + k_bias_params + v_bias_params) * data_type_bytes / (expert_tp_size * ep_size) : 0)} + ${formatIntermediateBytes(memory_attn_output_params)} + ${formatIntermediateBytes(post_attn_norm.memory_params)} + ${formatIntermediateBytes(tp_size > 0 ? memory_dense_params / tp_size : 0)} + ${formatIntermediateBytes(expert_tp_size > 0 && ep_size > 0 ? memory_router_experts_params / (expert_tp_size * ep_size) : 0)} + ${formatIntermediateBytes(tp_size > 0 ? memory_shared_experts_params / tp_size : 0)} + ${formatIntermediateBytes(memory_shared_gate_params)} + ${formatIntermediateBytes(memory_moe_router_params)}\n= ${formatIntermediateBytes(memory_per_parallel_layer_replica_params_total)} Bytes (~${formatBytes(memory_per_parallel_layer_replica_params_total)})
+\n\nGradients:\n= Parameter Memory * ${gradient_bytes / data_type_bytes}\n= ${formatIntermediateBytes(memory_per_parallel_layer_replica_params_total)} * ${gradient_bytes / data_type_bytes}\n= ${formatIntermediateBytes(memory_per_parallel_layer_replica_gradients)} Bytes (~${formatBytes(memory_per_parallel_layer_replica_gradients)})
+\n\nOptimizer:\n`;
+             if (enable_do && dp_size > 1) {
+                 const expert_do_sharding_factor = (ep_size > 0 && dp_size > 0) ? (dp_size / ep_size) : 1;
+                 if (detailsMemPerParallelLayerReplicaDiv) detailsMemPerParallelLayerReplicaDiv.innerHTML += `= (Non-Expert Parameter Memory * ${optimizer_bytes / data_type_bytes} / DP Size) + (Expert Parameter Memory * ${optimizer_bytes / data_type_bytes} / (DP Size / EP Size))\n`; // Corrected explanation string
+                 if (detailsMemPerParallelLayerReplicaDiv) detailsMemPerParallelLayerReplicaDiv.innerHTML += `= (${formatIntermediateBytes(memory_per_parallel_layer_replica_params_non_expert_bytes)} * ${optimizer_bytes / data_type_bytes} / ${dp_size}) + (${formatIntermediateBytes(memory_per_parallel_layer_replica_params_expert_bytes)} * ${optimizer_bytes / data_type_bytes} / ${expert_do_sharding_factor})\n`;
+                 if (detailsMemPerParallelLayerReplicaDiv) detailsMemPerParallelLayerReplicaDiv.innerHTML += `= ${formatIntermediateBytes(memory_per_parallel_layer_replica_params_non_expert_bytes * optimizer_bytes / data_type_bytes / dp_size)} + ${formatIntermediateBytes(memory_per_parallel_layer_replica_params_expert_bytes * optimizer_bytes / data_type_bytes / expert_do_sharding_factor)}\n`;
+             } else {
+                 if (detailsMemPerParallelLayerReplicaDiv) detailsMemPerParallelLayerReplicaDiv.innerHTML += `= Parameter Memory * ${optimizer_bytes / data_type_bytes}\n`;
+                 if (detailsMemPerParallelLayerReplicaDiv) detailsMemPerParallelLayerReplicaDiv.innerHTML += `= ${formatIntermediateBytes(memory_per_parallel_layer_replica_params_total)} * ${optimizer_bytes / data_type_bytes}\n`;
+             }
+             if (detailsMemPerParallelLayerReplicaDiv) detailsMemPerParallelLayerReplicaDiv.innerHTML += `= ${formatIntermediateBytes(memory_per_parallel_layer_replica_optimizer)} Bytes (~${formatBytes(memory_per_parallel_layer_replica_optimizer)})
+\n\nTotal Memory:\n= Parameters + Gradients + Optimizer States\n= ${formatIntermediateBytes(memory_per_parallel_layer_replica_params_total)} + ${formatIntermediateBytes(memory_per_parallel_layer_replica_gradients)} + ${formatIntermediateBytes(memory_per_parallel_layer_replica_optimizer)}\n= ${formatIntermediateBytes(memory_per_parallel_layer_replica_total)} Bytes (~${formatBytes(memory_per_parallel_layer_replica_total)})
+\n<span class="annotation">PAN: Pre/Post-Attn Norm | Q: Q Projection | K/V: K/V Projection | AO: Attention Output | FFN: Feed Forward Network | TP: Tensor Parallelism | EP: Expert Parallelism | DP: Data Parallelism</span>`;
+
+
+            // Populate PP stage specific elements if they exist (PP > 1 case)
+            // This needs to run AFTER ppStageContentDiv.innerHTML is set
+            if (pp_size > 1) {
+                const memPpFirstStageSpan = document.getElementById('memPpFirstStage');
+                const detailsPpFirstStageDiv = document.getElementById('detailsPpFirstStage');
+                const intermediateStageGroupDiv = document.getElementById('intermediateStageGroup');
+                const numIntermediateStagesSpan = document.getElementById('numIntermediateStages');
+                const memPpIntermediateStagesSpan = document.getElementById('memPpIntermediateStages');
+                const detailsPpIntermediateStagesDiv = document.getElementById('detailsPpIntermediateStages');
+                const memPpLastStageSpan = document.getElementById('memPpLastStage');
+                const detailsPpLastStageDiv = document.getElementById('detailsPpLastStage');
+
+
+                if (memPpFirstStageSpan) {
+                    memPpFirstStageSpan.textContent = `${pp_first_stage_memory_total.toLocaleString()} Bytes (~${formatBytes(pp_first_stage_memory_total)})`;
+                }
+
+                 if (detailsPpFirstStageDiv) {
+                    detailsPpFirstStageDiv.innerHTML = `Memory for the First PP Stage:
+Parameters:\n(WE / TP) + (PL * LPR)\n= ${formatIntermediateBytes(tp_size > 0 ? memory_word_embedding_params / tp_size : 0)} + ${formatIntermediateBytes(memory_per_parallel_layer_replica_params_total * layers_per_rank)}\n= ${formatIntermediateBytes(pp_first_stage_memory_params)} Bytes (~${formatBytes(pp_first_stage_memory_params)})
+\n\nGradients:\n= Parameter Memory * ${gradient_bytes / data_type_bytes}\n= ${formatIntermediateBytes(pp_first_stage_memory_params)} * ${gradient_bytes / data_type_bytes}\n= ${formatIntermediateBytes(pp_first_stage_memory_gradients)} Bytes (~${formatBytes(pp_first_stage_memory_gradients)})
+\n\nOptimizer:\n`;
+                 if (enable_do && dp_size > 1) {
+                      const expert_do_sharding_factor = (ep_size > 0 && dp_size > 0) ? (dp_size / ep_size) : 1;
+                      // Calculate non-expert and expert parameter memory for the first stage specifically
+                      const pp_first_stage_params_non_expert_bytes = (tp_size > 0 ? memory_word_embedding_params / tp_size : 0) + (memory_per_parallel_layer_replica_params_non_expert_bytes * layers_per_rank);
+                      const pp_first_stage_params_expert_bytes = memory_per_parallel_layer_replica_params_expert_bytes * layers_per_rank; // Expert part of layers
+
+                      if (detailsPpFirstStageDiv) detailsPpFirstStageDiv.innerHTML += `= (Non-Expert Stage Parameters * ${optimizer_bytes / data_type_bytes} / DP Size) + (Expert Stage Parameters * ${optimizer_bytes / data_type_bytes} / (DP Size / EP Size))\n`; // Corrected explanation string
+                      if (detailsPpFirstStageDiv) detailsPpFirstStageDiv.innerHTML += `= (${formatIntermediateBytes(pp_first_stage_params_non_expert_bytes)} * ${optimizer_bytes / data_type_bytes} / ${dp_size}) + (${formatIntermediateBytes(pp_first_stage_params_expert_bytes)} * ${optimizer_bytes / data_type_bytes} / ${expert_do_sharding_factor}))\n`;
+                       if (detailsPpFirstStageDiv) detailsPpFirstStageDiv.innerHTML += `= ${formatIntermediateBytes(pp_first_stage_params_non_expert_bytes * optimizer_bytes / data_type_bytes / dp_size)} + ${formatIntermediateBytes(pp_first_stage_params_expert_bytes * optimizer_bytes / data_type_bytes / expert_do_sharding_factor)}\n`;
+                 } else {
+                      if (detailsPpFirstStageDiv) detailsPpFirstStageDiv.innerHTML += `= Parameter Memory * ${optimizer_bytes / data_type_bytes}\n`;
+                      if (detailsPpFirstStageDiv) detailsPpFirstStageDiv.innerHTML += `= ${formatIntermediateBytes(pp_first_stage_memory_params)} * ${optimizer_bytes / data_type_bytes}\n`;
+                 }
+                 if (detailsPpFirstStageDiv) detailsPpFirstStageDiv.innerHTML += `= ${formatIntermediateBytes(pp_first_stage_memory_optimizer)} Bytes (~${formatBytes(pp_first_stage_memory_optimizer)})
+\n\nTotal Memory:\n= Parameters + Gradients + Optimizer States\n= ${formatIntermediateBytes(pp_first_stage_memory_params)} + ${formatIntermediateBytes(pp_first_stage_memory_gradients)} + ${formatIntermediateBytes(pp_first_stage_memory_optimizer)}\n= ${formatIntermediateBytes(pp_first_stage_memory_total)} Bytes (~${formatBytes(pp_first_stage_memory_total)})
+\n<span class="annotation">WE: Word Embedding | PL: Per Layer | LPR: Layers Per Rank | TP: Tensor Parallelism | DP: Data Parallelism | EP: Expert Parallelism</span>`;
+                }
+
+
+                // Handle intermediate stage specific population and visibility
+                if (intermediateStageGroupDiv) {
+                    if (pp_size > 2) {
+                        intermediateStageGroupDiv.style.display = 'block';
+                        if(numIntermediateStagesSpan) numIntermediateStagesSpan.textContent = pp_size - 2;
+                        if(memPpIntermediateStagesSpan) memPpIntermediateStagesSpan.textContent = `${pp_intermediate_stage_memory_total.toLocaleString()} Bytes (~${formatBytes(pp_intermediate_stage_memory_total)})`;
+                         if(detailsPpIntermediateStagesDiv) detailsPpIntermediateStagesDiv.innerHTML = `Memory for Each Intermediate PP Stage (there are ${pp_size - 2} stages):
+Parameters:\n= Memory Per Parallelized Layer Replica * Layers Per Rank\n= ${formatIntermediateBytes(memory_per_parallel_layer_replica_params_total)} * ${layers_per_rank}\n= ${formatIntermediateBytes(pp_intermediate_stage_memory_params)} Bytes (~${formatBytes(pp_intermediate_stage_memory_params)})
+\n\nGradients:\n= Parameter Memory * ${gradient_bytes / data_type_bytes}\n= ${formatIntermediateBytes(pp_intermediate_stage_memory_params)} * ${gradient_bytes / data_type_bytes}\n= ${formatIntermediateBytes(memory_per_parallel_layer_replica_gradients * layers_per_rank)} Bytes (~${formatBytes(memory_per_parallel_layer_replica_gradients)})
+\n\nOptimizer:\n`;
+                         if (enable_do && dp_size > 1) {
+                             const expert_do_sharding_factor = (ep_size > 0 && dp_size > 0) ? (dp_size / ep_size) : 1;
+                             // Calculate non-expert and expert parameter memory for intermediate stages
+                             const pp_intermediate_stage_params_non_expert_bytes = memory_per_parallel_layer_replica_params_non_expert_bytes * layers_per_rank;
+                             const pp_intermediate_stage_params_expert_bytes = memory_per_parallel_layer_replica_params_expert_bytes * layers_per_rank;
+
+                             if (detailsPpIntermediateStagesDiv) detailsPpIntermediateStagesDiv.innerHTML += `= ((Non-Expert PL * ${optimizer_bytes / data_type_bytes} / DP Size) + (Expert PL * ${optimizer_bytes / data_type_bytes} / (DP Size / EP Size)))\n`; // Corrected explanation string
+                             if (detailsPpIntermediateStagesDiv) detailsPpIntermediateStagesDiv.innerHTML += `= ((${formatIntermediateBytes(pp_intermediate_stage_params_non_expert_bytes)} * ${optimizer_bytes / data_type_bytes} / ${dp_size}) + (${formatIntermediateBytes(pp_intermediate_stage_params_expert_bytes)} * ${optimizer_bytes / data_type_bytes} / ${expert_do_sharding_factor}))\n`;
+                             if (detailsPpIntermediateStagesDiv) detailsPpIntermediateStagesDiv.innerHTML += `= ${formatIntermediateBytes(((pp_intermediate_stage_params_non_expert_bytes * optimizer_bytes / data_type_bytes / dp_size) + (pp_intermediate_stage_params_expert_bytes * optimizer_bytes / data_type_bytes / expert_do_sharding_factor)))}\n`;
+
+                         } else {
+                             if (detailsPpIntermediateStagesDiv) detailsPpIntermediateStagesDiv.innerHTML += `= Parameter Memory * ${optimizer_bytes / data_type_bytes}\n`;
+                             if (detailsPpIntermediateStagesDiv) detailsPpIntermediateStagesDiv.innerHTML += `= ${formatIntermediateBytes(pp_intermediate_stage_memory_params)} * ${optimizer_bytes / data_type_bytes}\n`;
+                         }
+                         if (detailsPpIntermediateStagesDiv) detailsPpIntermediateStagesDiv.innerHTML += `= ${formatIntermediateBytes(pp_intermediate_stage_memory_optimizer)} Bytes (~${formatBytes(pp_intermediate_stage_memory_optimizer)})
+\n\nTotal Memory:\n= Parameters + Gradients + Optimizer States\n= ${formatIntermediateBytes(pp_intermediate_stage_memory_params)} + ${formatIntermediateBytes(memory_per_parallel_layer_replica_gradients * layers_per_rank)} + ${formatIntermediateBytes(pp_intermediate_stage_memory_optimizer)}\n= ${formatIntermediateBytes(pp_intermediate_stage_memory_total)} Bytes (~${formatBytes(pp_intermediate_stage_memory_total)})`;
+
+                    } else {
+                        intermediateStageGroupDiv.style.display = 'none';
+                    }
+                }
+
+
+                 if (memPpLastStageSpan) {
+                    memPpLastStageSpan.textContent = `${pp_last_stage_memory_total.toLocaleString()} Bytes (~${formatBytes(pp_last_stage_memory_total)})`;
+                }
+                if (detailsPpLastStageDiv) {
+                    detailsPpLastStageDiv.innerHTML = `Memory for the Last PP Stage:
+Parameters:\n(PL * LPR) + (ON / TP) + (OL / TP)\n= ${formatIntermediateBytes(memory_per_parallel_layer_replica_params_total)} * ${layers_per_rank} + ${formatIntermediateBytes(output_norm.memory_params)} / ${tp_size} + ${formatIntermediateBytes(memory_output_layer_params)} / ${tp_size}\n= ${formatIntermediateBytes(memory_per_parallel_layer_replica_params_total * layers_per_rank)} + ${formatIntermediateBytes(tp_size > 0 ? output_norm.memory_params / tp_size : 0)} + ${formatIntermediateBytes(tp_size > 0 ? memory_output_layer_params / tp_size : 0)}\n= ${formatIntermediateBytes(pp_last_stage_memory_params)} Bytes (~${formatBytes(pp_last_stage_memory_params)})
+\n\nGradients:\n= Parameter Memory * ${gradient_bytes / data_type_bytes}\n= ${formatIntermediateBytes(pp_last_stage_memory_params)} * ${gradient_bytes / data_type_bytes}\n= ${formatIntermediateBytes(pp_last_stage_memory_gradients)} Bytes (~${formatBytes(pp_last_stage_memory_gradients)})
+\n\nOptimizer:\n`;
+                if (enable_do && dp_size > 1) {
+                    const expert_do_sharding_factor = (ep_size > 0 && dp_size > 0) ? (dp_size / ep_size) : 1;
+                    // Calculate non-expert and expert parameter memory for the last stage
+                    const pp_last_stage_params_non_expert_bytes = (memory_per_parallel_layer_replica_params_non_expert_bytes * layers_per_rank) + (tp_size > 0 ? output_norm.memory_params / tp_size : 0) + (tp_size > 0 ? memory_output_layer_params / tp_size : 0);
+                    const pp_last_stage_params_expert_bytes = memory_per_parallel_layer_replica_params_expert_bytes * layers_per_rank; // Expert part of layers
+
+                    if (detailsPpLastStageDiv) detailsPpLastStageDiv.innerHTML += `= ((Non-Expert Stage Parameters * ${optimizer_bytes / data_type_bytes} / DP Size) + (Expert Stage Parameters * ${optimizer_bytes / data_type_bytes} / (DP Size / EP Size)))\n`; // Corrected explanation string
+                    if (detailsPpLastStageDiv) detailsPpLastStageDiv.innerHTML += `= (${formatIntermediateBytes(pp_last_stage_params_non_expert_bytes)} * ${optimizer_bytes / data_type_bytes} / ${dp_size}) + (${formatIntermediateBytes(pp_last_stage_params_expert_bytes)} * ${optimizer_bytes / data_type_bytes} / ${expert_do_sharding_factor}))\n`;
+                    if (detailsPpLastStageDiv) detailsPpLastStageDiv.innerHTML += `= ${formatIntermediateBytes(((pp_last_stage_params_non_expert_bytes * optimizer_bytes / data_type_bytes / dp_size) + (pp_last_stage_params_expert_bytes * optimizer_bytes / data_type_bytes / expert_do_sharding_factor)))}\n`;
+                } else {
+                    if (detailsPpLastStageDiv) detailsPpLastStageDiv.innerHTML += `= Parameter Memory * ${optimizer_bytes / data_type_bytes}\n`;
+                    if (detailsPpLastStageDiv) detailsPpLastStageDiv.innerHTML += `= ${formatIntermediateBytes(pp_last_stage_memory_params)} * ${optimizer_bytes / data_type_bytes}\n`;
+                }
+                 if (detailsPpLastStageDiv) detailsPpLastStageDiv.innerHTML += `= ${formatIntermediateBytes(pp_last_stage_memory_optimizer)} Bytes (~${formatBytes(pp_last_stage_memory_optimizer)})
+\n\nTotal Memory:\n= Parameters + Gradients + Optimizer States\n= ${formatIntermediateBytes(pp_last_stage_memory_params)} + ${formatIntermediateBytes(pp_last_stage_memory_gradients)} + ${formatIntermediateBytes(pp_last_stage_memory_optimizer)}\n= ${formatIntermediateBytes(pp_last_stage_memory_total)} Bytes (~${formatBytes(pp_last_stage_memory_total)})
+\n<span class="annotation">PL: Per Layer | LPR: Layers Per Rank | ON: Output Norm | OL: Output Layer | TP: Tensor Parallelism | DP: Data Parallelism | EP: Expert Parallelism</span>`;
+                }
+
+            }
+
+            // Update toggler button text after dynamic content is populated and visible state is set
+            requestAnimationFrame(() => {
+                updateTogglerButtonText('resultsToggler');
+                updateTogglerButtonText('rightPanelToggler');
+            });
+
+            console.log("Calculate function finished.");
+        }
+
+        // Function to toggle all collapsibles in a given panel
+        function toggleAllCollapsibles(panelId) {
+            const panel = document.getElementById(panelId);
+            if (!panel) return;
+
+            // Select only collapsible buttons within result groups inside the panel
+            const collapsibles = panel.querySelectorAll('.result-group .collapsible');
+            if (collapsibles.length === 0) {
+                return;
+            }
+
+            // Determine the target state: if ANY are collapsed, expand all. Otherwise, collapse all.
+            let shouldExpand = false;
+            for (const collapsible of collapsibles) {
+                if (!collapsible.classList.contains('expanded')) {
+                    shouldExpand = true;
+                    break;
+                }
+            }
+
+            collapsibles.forEach(collapsible => {
+                const content = collapsible.nextElementSibling;
+                if (shouldExpand) {
+                    collapsible.classList.add('expanded');
+                    if (content) content.classList.remove('collapsed');
+                } else {
+                    collapsible.classList.remove('expanded');
+                    if (content) content.classList.add('collapsed');
+                }
+            });
+
+            // Update the toggler button text
+            updateTogglerButtonText(panelId === 'results' ? 'resultsToggler' : 'rightPanelToggler');
+        }
+
+        // Function to update the text of the toggler button based on the state of collapsibles
+        function updateTogglerButtonText(buttonId) {
+             const button = document.getElementById(buttonId);
+             const panelId = buttonId === 'resultsToggler' ? 'results' : 'rightPanel';
+             const panel = document.getElementById(panelId);
+             if (!button || !panel) {
+                 return;
+             }
+
+             // Select only the actual collapsible buttons within the panel
+             const collapsibles = panel.querySelectorAll('.result-group .collapsible');
+
+             if (collapsibles.length === 0) {
+                 button.textContent = 'No sections';
+                 button.disabled = true;
+                 return;
+             }
+
+             // Check if ALL are expanded
+             const allExpanded = Array.from(collapsibles).every(col => col.classList.contains('expanded'));
+
+             button.textContent = allExpanded ? 'Collapse All' : 'Expand All';
+             button.disabled = false; // Enable button if there are sections
+        }
+
+
+        // Function to set up click listeners for individual collapsibles using event delegation
+        function setupCollapsibleDelegation(panelId) {
+            const panel = document.getElementById(panelId);
+            if (!panel) {
+                return;
+            }
+
+            // Check if listener is already added to avoid duplicates on recalculate
+            if (panel.dataset.collapsibleDelegation === 'true') {
+                return; // Listener already exists
+            }
+
+            // Add the click listener to the panel
+            panel.addEventListener('click', (event) => {
+                const collapsibleButton = event.target.closest('.result-group .collapsible');
+                if (collapsibleButton) {
+                    const content = collapsibleButton.nextElementSibling;
+                    collapsibleButton.classList.toggle('expanded');
+                    if (content) {
+                        // CORRECTED: Toggle the 'collapsed' class on the content
+                        content.classList.toggle('collapsed');
+                    }
+                    // After individual toggle, update the 'Expand/Collapse All' button text
+                     updateTogglerButtonText(panelId === 'results' ? 'resultsToggler' : 'rightPanelToggler');
+                }
+            });
+
+            // Mark the panel to indicate delegation is set up
+            panel.dataset.collapsibleDelegation = 'true';
+
+             // Initial state setup for collapsibles present on load
+             // This applies to static collapsibles initially and dynamic ones after innerHTML is set.
+             // We ensure this happens inside the requestAnimationFrame in calculate().
+        }
+
+        // Function to set up listeners for all current and future collapsibles
+        function setupCollapsibleListeners() {
+            // Use event delegation on the main result panels
+            setupCollapsibleDelegation('results');
+            setupCollapsibleDelegation('rightPanel');
+
+            // Also ensure initial state is set for all collapsibles currently in the DOM
+            document.querySelectorAll('.result-group .collapsible').forEach(button => {
+                 const content = button.nextElementSibling;
+                 if (content) {
+                     // Ensure initial state matches the 'expanded' class
+                     if (!button.classList.contains('expanded')) {
+                         content.classList.add('collapsed');
+                     } else {
+                         content.classList.remove('collapsed');
+                     }
+                 }
+            });
+        }
+
+
+        // Auto-calculate on load and input changes
+        window.addEventListener('DOMContentLoaded', () => {
+            // Set up event delegation for both panels once
+            setupCollapsibleDelegation('results');
+            setupCollapsibleDelegation('rightPanel');
+
+            // Add event listeners for the toggler buttons
+            const resultsToggler = document.getElementById('resultsToggler');
+            const rightPanelToggler = document.getElementById('rightPanelToggler');
+            if (resultsToggler) resultsToggler.addEventListener('click', () => toggleAllCollapsibles('results'));
+            if (rightPanelToggler) rightPanelToggler.addEventListener('click', () => toggleAllCollapsibles('rightPanel'));
+
+            // Add input change listeners
+            document.querySelectorAll('input, select').forEach(input => {
+                input.addEventListener('input', calculate);
+                input.addEventListener('change', calculate); // Add change listener for selects/numbers
+            });
+
+            // Add event listener for the DO checkbox
+            const enableDOCheckbox = document.getElementById('enableDO');
+            const dpSizeSelect = document.getElementById('dpSize');
+            const dpSizeLabel = document.getElementById('dpSizeLabel');
+
+            enableDOCheckbox.addEventListener('change', () => {
+                if (enableDOCheckbox.checked) {
+                    dpSizeSelect.disabled = false;
+                    dpSizeLabel.style.color = '#333'; // Restore label color
+                } else {
+                    dpSizeSelect.disabled = true;
+                     dpSizeLabel.style.color = '#a0a0a0'; // Grey out label
+                }
+                calculate(); // Recalculate when DO is toggled
+            });
+
+             // Add change listener for DP size
+             dpSizeSelect.addEventListener('change', calculate);
+
+             // Add change listener for numHeads to repopulate queryGroups
+             const numHeadsSelect = document.getElementById('numHeads');
+             numHeadsSelect.addEventListener('change', () => {
+                 populateQueryGroups(); // Repopulate query groups when numHeads changes
+                 calculate(); // Then recalculate
+             });
+
+             // Add change listener for queryGroups to recalculate
+             const queryGroupsSelect = document.getElementById('queryGroups');
+             queryGroupsSelect.addEventListener('change', calculate);
+
+
+             // Populate query groups initially and then calculate
+             populateQueryGroups();
+             calculate();
+        });
+
+         // Run calculate initially on window load as a fallback/double check
+         window.addEventListener('load', calculate);
+
+
+    </script>
+</body>
+</html>
